@@ -92,6 +92,8 @@ std::atomic<bool> map_hidden{false};
 std::atomic<int> map_dy{0};
 }  // namespace st::pad
 
+extern "C" int ffcc_join_screens;  // (melonDS, third_party/CMakeLists.txt: two-screen 3D shown joined)
+
 namespace {
 
 constexpr char kTitle[] = "The Legend of Zelda: Spirit Tracks";
@@ -734,6 +736,7 @@ private:
         dual_still_ = moved ? 0 : std::min(dual_still_ + 1, 1000);
         dual_3d_ = extra > 0 && frame.gl_texture && (dual_run_ >= 4 || (dual_3d_ && dual_still_ < 3));
         st::set_dual_screen_3d(dual_3d_);
+        ffcc_join_screens = dual_3d_ ? 1 : 0;  // (closes the gap the game leaves between the two halves: third_party)
         if (extra > 0 && frame.gl_texture && (moved || dual_3d_)) gl_->hold_wide(frame);
         const auto layer_wide = [&](int layer) { return extra > 0 && (dual_3d_ || layer == frame.wide_layer); };
         const auto layer_held = [&](int layer) { return dual_3d_ && layer != frame.wide_layer; };

@@ -68,6 +68,13 @@ ffcc_patch(gpu3d_src GPU3D.cpp "#include <algorithm>\n"
   "#include <algorithm>\n#include <cmath>\n")
 ffcc_patch(gpu3d_src GPU3D.cpp "bool FfccGxReplaying = false;\n"
   "bool FfccGxReplaying = false;\nint FfccStableUV = 0; // ffcc patch\nint FfccSmoothTex = 0; // ffcc patch\nstatic bool ffcc_subdividing = false;\nstatic int ffcc_added_p = 0, ffcc_added_v = 0, ffcc_base_p = 0, ffcc_base_v = 0, ffcc_last_p = 0, ffcc_last_v = 0;\n#define FFCC_UV_GRID 4\n")
+# Two-screen 3D shown joined (Spirit Tracks: the frontend sets ffcc_join_screens): the game splits one tall view between
+# the screens, the top one's projection shifted up by 2.19 screen heights (_21 = 8960) for the DS's gap between them.
+# Shown one above the other that gap was a seam; shifted by exactly 2 (8192) the two halves meet.
+ffcc_patch(gpu3d_src GPU3D.cpp "                        MatrixLoad4x4(ProjMatrix, (s32*)ExecParams);\n"
+  "                        MatrixLoad4x4(ProjMatrix, (s32*)ExecParams);\n                        if (ffcc_join_screens && ProjMatrix[9] > 8192 && ProjMatrix[9] < 12288) ProjMatrix[9] = 8192; // st patch\n                        else if (ffcc_join_screens && ProjMatrix[9] < -8192 && ProjMatrix[9] > -12288) ProjMatrix[9] = -8192;\n")
+ffcc_patch(gpu3d_src GPU3D.cpp "bool FfccGxReplaying = false;\n"
+  "bool FfccGxReplaying = false;\nextern \"C\" int ffcc_join_screens = 0; // st patch: the two screens are shown joined (frontend)\n")
 ffcc_write_patched(gpu3d_src ${CMAKE_CURRENT_BINARY_DIR}/melonds_patched/GPU3D.cpp)
 
 # GPU3D_OpenGL.cpp: with FfccWideExtra set, the 3D texture is (256 + 2 * extra) pixels wide (a widescreen picture; the
