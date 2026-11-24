@@ -1032,6 +1032,15 @@ int main(int argc, char** argv) {
             SDL_free(pref);
         }
     }
+#ifdef __ANDROID__
+    // A shell APK (built with -PstShell) carries no game: the recompiled game is copied beside the ROM instead
+    // (game/libst_game.so in the app's files), so a change to the program needs only the small APK reinstalled. A
+    // module there is used in either APK.
+    // (SDL_GetBasePath is not the files dir on Android: use the internal storage path.)
+    if (const char* files = SDL_GetAndroidInternalStoragePath();
+        files && module_path == st::default_module_path() && fs::exists(fs::path(files) / "game" / "libst_game.so", ec))
+        module_path = fs::path(files) / "game" / "libst_game.so";
+#endif
     if (rom_path.empty()) rom_path = base / "rom" / "bkie.nds";
     if (save_path.empty()) save_path = data_dir / "saves" / "bkie.sav";
     const fs::path settings_path = data_dir / "settings.ini";

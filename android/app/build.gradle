@@ -26,6 +26,8 @@ android {
         versionName "0.1.0"
         buildConfigField "String", "ROM_SHA1", "\"${romSha1}\""
         buildConfigField "String", "ROM_VARIANT", "\"${romVariant}\""
+        // A shell APK (-PstShell) has no game inside: the launcher asks for the game module (libst_game.so).
+        buildConfigField "boolean", "SHELL", project.hasProperty('stShell') ? "true" : "false"
         externalNativeBuild {
             cmake {
                 arguments "-DANDROID_STL=c++_static", "-DANDROID_PLATFORM=android-26",
@@ -33,7 +35,12 @@ android {
                         "-DFETCHCONTENT_SOURCE_DIR_SDL3=${sdlSource}", "-DFETCHCONTENT_FULLY_DISCONNECTED=ON"
                 if (ninja) arguments "-DCMAKE_MAKE_PROGRAM=${slashes(ninja)}"
                 abiFilters 'arm64-v8a'
-                targets 'main', 'st_game'
+                if (project.hasProperty('stShell')) {
+                    arguments "-DST_SHELL=ON"
+                    targets 'main', 'stbuild'
+                } else {
+                    targets 'main', 'st_game'
+                }
             }
         }
     }
@@ -45,6 +52,13 @@ android {
         release {
             minifyEnabled false
         }
+    }
+    // -PstShell: a shell APK, without the recompiled game (libst_game.so, still built): the game is copied to the app's
+    // files (game/libst_game.so, beside rom/) and loaded from there. See scripts/README.md.
+    // The shell APK's builder assets (GameBuilder.java unpacks them): TinyCC's headers, the runtime header the game's C
+    // includes, and the game's recompiler config (functions/hooks/regions: no game data).
+    if (project.hasProperty('stShell')) {
+        sourceSets { main { assets.srcDirs += layout.buildDirectory.dir('stbuild-assets') } }
     }
     externalNativeBuild {
         cmake {
@@ -59,3 +73,14 @@ android {
         abortOnError = false
     }
 }
+
+// The shell APK's builder assets, under build/stbuild-assets/stbuild/{tcc,rt,config}.
+tasks.register('stBuildAssets', Copy) {
+    def out = layout.buildDirectory.dir('stbuild-assets/stbuild')
+    into out
+    from(new File(repo, 'third_party/tinycc/include')) { into 'tcc/include' }
+    from(new File(repo, 'tools/ondevice')) { include '*.h'; into 'tcc/include' }
+    from(new File(repo, 'runtime/include')) { into 'rt' }
+    from(new File(repo, 'frontend/config/bkie')) { into 'config' }
+}
+if (project.hasProperty('stShell')) preBuild.dependsOn 'stBuildAssets'

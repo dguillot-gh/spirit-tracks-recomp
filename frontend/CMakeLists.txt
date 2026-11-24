@@ -16,16 +16,27 @@ add_custom_command(
 # ---- Android: the game's C comes from a PC build (recomp_generated), compiled here for the phone ----
 if(ANDROID)
   set(ST_GENERATED_DIR "" CACHE PATH "The recomp_generated folder of a PC build (2-BUILD.ps1)")
-  if(NOT EXISTS "${ST_GENERATED_DIR}/func_table.c")
+  if(ST_SHELL)
+    # The shell APK: no game inside. libstbuild = the recompiler + TinyCC (LGPL, kept in its own library), which build
+    # files/game/libst_game.so on the phone from the player's ROM (android_build.cpp).
+    set(TCC_DIR ${CMAKE_SOURCE_DIR}/third_party/tinycc)
+    add_library(stbuild SHARED src/android_build.cpp ${TCC_DIR}/libtcc.c)
+    set_source_files_properties(${TCC_DIR}/libtcc.c PROPERTIES COMPILE_OPTIONS "-w" COMPILE_DEFINITIONS "ONE_SOURCE=1")
+    target_include_directories(stbuild PRIVATE ${TCC_DIR})
+    target_compile_options(stbuild PRIVATE -O2)
+    target_link_libraries(stbuild PRIVATE ntr_recomp ntr_common log)
+  elseif(NOT EXISTS "${ST_GENERATED_DIR}/func_table.c")
     message(FATAL_ERROR "ST_GENERATED_DIR must be a PC build's recomp_generated folder (run 2-BUILD.ps1 first)")
   endif()
   file(GLOB ST_GEN_SHARDS CONFIGURE_DEPENDS "${ST_GENERATED_DIR}/funcs_*.c")
+  if(NOT ST_SHELL)
   add_library(st_game SHARED ${ST_GENERATED_DIR}/func_table.c ${ST_GEN_SHARDS})
   target_include_directories(st_game PRIVATE ${ST_GENERATED_DIR} ${CMAKE_SOURCE_DIR}/runtime/include)
   target_compile_definitions(st_game PRIVATE NTR_GAME_MODULE=1)
   set_target_properties(st_game PROPERTIES C_VISIBILITY_PRESET hidden)
   target_compile_options(st_game PRIVATE -w -ffreestanding -fno-stack-protector -O2)
   target_link_options(st_game PRIVATE -nostdlib)
+  endif()
 
   # SDL's Android activity loads the program as libmain.so and calls its SDL_main.
   add_library(main SHARED src/main.cpp src/game_module.cpp src/st_hooks.cpp src/st_stick.cpp src/st_text.cpp
@@ -34,7 +45,9 @@ if(ANDROID)
   target_compile_options(main PRIVATE -O2)
   target_link_libraries(main PRIVATE ntr_runtime ntr_common SDL3::SDL3-static android log
                         "$<LINK_GROUP:RESCAN,ntr_runtime,melonds_core>")
-  add_dependencies(main st_game)
+  if(NOT ST_SHELL)
+    add_dependencies(main st_game)
+  endif()
   return()
 endif()
 
