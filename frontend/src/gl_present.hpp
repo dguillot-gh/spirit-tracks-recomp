@@ -36,7 +36,11 @@ public:
     // One displayed frame: begin, draw, end (shows it).
     void begin(int width, int height);  // window pixels
     // Layer 0 top, 1 bottom. `wide`: a widescreen picture's wide screen is shown whole (else its middle 256 pixels).
-    void screen(const ntr::Frame& frame, int layer, const Rect& where, bool smooth, bool wide = false);
+    // `held`: that screen's picture kept by hold_wide() instead (whole), not this frame's.
+    void screen(const ntr::Frame& frame, int layer, const Rect& where, bool smooth, bool wide = false, bool held = false);
+    // Widescreen, the GPU renderer: keeps a copy of this frame's wide screen (layer frame.wide_layer, engine A's
+    // picture), for screen(..., held) on later frames. Call before begin().
+    void hold_wide(const ntr::Frame& frame);
     // Optional HD vector text overlay for layer (0 top, 1 bottom), aligned to `where` (and any widescreen HUD moves).
     void draw_hd_text(int layer, const Rect& where, int wide_extra, const HudMove* hud = nullptr, int hud_count = 0);
     void fill(const Rect& where, uint32_t argb);
@@ -68,6 +72,8 @@ private:
     static constexpr int kThumbLayers = 24;
     static constexpr int kHdAtlasSize = 1024;
     unsigned program_ = 0, vao_ = 0, vbo_ = 0, soft_tex_ = 0, font_tex_ = 0, hd_font_tex_ = 0, read_fbo_ = 0, thumb_tex_ = 0;
+    unsigned held_tex_ = 0, held_fbo_ = 0;  // hold_wide(): both screens' last wide pictures, and a framebuffer to copy
+    int held_w_ = 0, held_h_ = 0;
     float hd_atlas_px_ = 0.0f;
     int hd_pen_x_ = 1, hd_pen_y_ = 1, hd_row_h_ = 0;
     std::unordered_map<uint16_t, HdAtlasGlyph> hd_glyphs_;

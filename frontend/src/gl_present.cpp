@@ -190,6 +190,10 @@ bool GlPresenter::init(SDL_Window* window, std::string& error) {
 void GlPresenter::shutdown() {
     if (!context_) return;
     glDeleteFramebuffers(1, &read_fbo_);
+    if (held_fbo_) glDeleteFramebuffers(1, &held_fbo_);
+    if (held_tex_) glDeleteTextures(1, &held_tex_);
+    held_fbo_ = held_tex_ = 0;
+    held_w_ = held_h_ = 0;
     glDeleteTextures(1, &soft_tex_);
     glDeleteTextures(1, &thumb_tex_);
     glDeleteTextures(1, &font_tex_);
@@ -238,9 +242,40 @@ void GlPresenter::quad(const Rect& r, float u0, float v0, float u1, float v1) {
     glDrawArrays(GL_TRIANGLES, 0, 6);
 }
 
-void GlPresenter::screen(const ntr::Frame& frame, int layer, const Rect& where, bool smooth, bool wide) {
+void GlPresenter::hold_wide(const ntr::Frame& frame) {
+    if (!frame.gl_texture || frame.wide_extra <= 0 || frame.wide_layer < 0 || frame.wide_layer > 1) return;
+    int w = 0, h = 0;
+    glBindTexture(GL_TEXTURE_2D_ARRAY, frame.gl_texture);
+    glGetTexLevelParameteriv(GL_TEXTURE_2D_ARRAY, 0, GL_TEXTURE_WIDTH, &w);
+    glGetTexLevelParameteriv(GL_TEXTURE_2D_ARRAY, 0, GL_TEXTURE_HEIGHT, &h);
+    if (w <= 0 || h <= 0) return;
+    if (!held_tex_ || w != held_w_ || h != held_h_) {
+        if (!held_tex_) glGenTextures(1, &held_tex_);
+        if (!held_fbo_) glGenFramebuffers(1, &held_fbo_);
+        glBindTexture(GL_TEXTURE_2D_ARRAY, held_tex_);
+        glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_RGBA8, w, h, 2, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+        glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        held_w_ = w, held_h_ = h;
+    }
+    glDisable(GL_SCISSOR_TEST);
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, read_fbo_);
+    glFramebufferTextureLayer(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, frame.gl_texture, 0, frame.wide_layer);
+    glReadBuffer(GL_COLOR_ATTACHMENT0);
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, held_fbo_);
+    glFramebufferTextureLayer(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, held_tex_, 0, frame.wide_layer);
+    const GLenum attachment = GL_COLOR_ATTACHMENT0;
+    glDrawBuffers(1, &attachment);
+    glBlitFramebuffer(0, 0, w, h, 0, 0, w, h, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+}
+
+void GlPresenter::screen(const ntr::Frame& frame, int layer, const Rect& where, bool smooth, bool wide, bool held) {
     glActiveTexture(GL_TEXTURE0);
-    if (frame.top && frame.bottom) {
+    if (held && held_tex_) {
+        glBindTexture(GL_TEXTURE_2D_ARRAY, held_tex_);
+    } else if (frame.top && frame.bottom) {
         glBindTexture(GL_TEXTURE_2D_ARRAY, soft_tex_);
         glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, layer, 256, 192, 1, kEs ? GL_RGBA : GL_BGRA, GL_UNSIGNED_BYTE,
                         layer == 0 ? frame.top : frame.bottom);
@@ -255,7 +290,7 @@ void GlPresenter::screen(const ntr::Frame& frame, int layer, const Rect& where, 
     // A widened picture (the GPU renderer's wide_extra) has the screen's 256 pixels in the middle; the wide screen
     // itself is shown whole when asked for (widescreen).
     float u0 = 0, u1 = 1;
-    if (frame.wide_extra > 0 && !(wide && layer == frame.wide_layer)) {
+    if (frame.wide_extra > 0 && !(wide && (layer == frame.wide_layer || (held && held_tex_)))) {
         const float total = 256.0f + 2.0f * float(frame.wide_extra);
         u0 = float(frame.wide_extra) / total;
         u1 = 1 - u0;
@@ -525,6 +560,8 @@ bool GlPresenter::recover(std::string& error) {
     SDL_GL_MakeCurrent(window_, nullptr);
     context_ = nullptr;
     program_ = vao_ = vbo_ = soft_tex_ = font_tex_ = hd_font_tex_ = read_fbo_ = thumb_tex_ = 0;
+    held_tex_ = held_fbo_ = 0;
+    held_w_ = held_h_ = 0;
     hd_atlas_px_ = 0.0f;
     hd_glyphs_.clear();
     checked_frame_texture_ = 0;

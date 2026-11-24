@@ -56,6 +56,11 @@ struct TextBox {
 };
 void text_boxes(int layer, std::vector<TextBox>& out);
 
+// Two-screen 3D (main.cpp): while the game draws its 3D on the top and bottom screens on alternate frames, each screen
+// shows engine A's picture from the frame it was last there (engine B's copy of it is only 256 pixels wide), and so the
+// text engine A drew on it then: engine B's text is left out meanwhile.
+void set_dual_screen_3d(bool on);
+
 // Copy the glyphs currently visible on `layer` (0 = top screen, 1 = bottom screen).
 void hd_text_draw_list(int layer, std::vector<HdGlyph>& out);
 
