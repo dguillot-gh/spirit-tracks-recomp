@@ -128,6 +128,13 @@ ffcc_patch(gpu_gl_src GPU_OpenGL.cpp "    glUseProgram(CaptureShader);\n\n    GL
   "    glUseProgram(CaptureShader);\n    glUniform1i(glGetUniformLocation(CaptureShader, \"uExtra\"), FfccWideExtra); // ffcc patch\n\n    GLuint inputA;\n")
 ffcc_patch(gpu_gl_src GPU_OpenGL.cpp "namespace melonDS\n{\n"
   "namespace melonDS\n{\nextern int FfccWideExtra; // ffcc patch\n")
+# The screens the frame was drawn with (POWCNT1 bit 15 at its last line), for the runtime: a game that moves engine A
+# between the screens every frame (Spirit Tracks' two-screen 3D) changes it again in its VBlank handler, before the
+# frame is handed over, so GPU.ScreenSwap then is the next frame's.
+ffcc_patch(gpu_gl_src GPU_OpenGL.cpp "    FinalPassConfig.uScreenSwap[line] = GPU.ScreenSwap;\n"
+  "    FinalPassConfig.uScreenSwap[line] = GPU.ScreenSwap;\n    if (line == 191) FfccDrawnScreenSwap = GPU.ScreenSwap; // st patch\n")
+ffcc_patch(gpu_gl_src GPU_OpenGL.cpp "extern int FfccWideExtra; // ffcc patch\n"
+  "extern int FfccWideExtra; // ffcc patch\nint FfccDrawnScreenSwap = -1; // st patch: GPU.ScreenSwap at the frame's last line (-1: none yet)\n")
 ffcc_write_patched(gpu_gl_src ${CMAKE_CURRENT_BINARY_DIR}/melonds_patched/GPU_OpenGL.cpp)
 
 # GPU2D_OpenGL.cpp: the compositor reads the 3D layer's middle 256 pixels when that texture is wider.
