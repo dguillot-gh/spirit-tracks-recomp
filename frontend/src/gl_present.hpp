@@ -72,7 +72,9 @@ private:
     static constexpr int kThumbLayers = 24;
     static constexpr int kHdAtlasSize = 1024;
     unsigned program_ = 0, vao_ = 0, vbo_ = 0, soft_tex_ = 0, font_tex_ = 0, hd_font_tex_ = 0, read_fbo_ = 0, thumb_tex_ = 0;
-    unsigned held_tex_ = 0, held_fbo_ = 0;  // hold_wide(): both screens' last wide pictures, and a framebuffer to copy
+    // hold_wide(): each screen's last wide picture, a one-layer texture each (an Adreno 710 driver copies nothing into
+    // a second layer), and a framebuffer to copy with
+    unsigned held_tex_[2] = {0, 0}, held_fbo_ = 0;
     int held_w_ = 0, held_h_ = 0;
     float hd_atlas_px_ = 0.0f;
     int hd_pen_x_ = 1, hd_pen_y_ = 1, hd_row_h_ = 0;
