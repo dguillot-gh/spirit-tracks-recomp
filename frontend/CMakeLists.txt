@@ -20,9 +20,9 @@ if(ANDROID)
     # The shell APK: no game inside. libstbuild = the recompiler + TinyCC (LGPL, kept in its own library), which build
     # files/game/libst_game.so on the phone from the player's ROM (android_build.cpp).
     set(TCC_DIR ${CMAKE_SOURCE_DIR}/third_party/tinycc)
-    add_library(stbuild SHARED src/android_build.cpp ${TCC_DIR}/libtcc.c)
+    add_library(stbuild SHARED src/android_build.cpp src/game_builder.cpp ${TCC_DIR}/libtcc.c)
     set_source_files_properties(${TCC_DIR}/libtcc.c PROPERTIES COMPILE_OPTIONS "-w" COMPILE_DEFINITIONS "ONE_SOURCE=1")
-    target_include_directories(stbuild PRIVATE ${TCC_DIR})
+    target_include_directories(stbuild PRIVATE ${TCC_DIR}/config/android ${TCC_DIR})
     target_compile_options(stbuild PRIVATE -O2)
     target_link_libraries(stbuild PRIVATE ntr_recomp ntr_common log)
   elseif(NOT EXISTS "${ST_GENERATED_DIR}/func_table.c")
@@ -110,6 +110,27 @@ if(ST_ROM)
   add_dependencies(SpiritTracks st_game)  # (built together, next to the program)
 endif()
 target_link_libraries(SpiritTracks PRIVATE ntr_runtime ntr_common SDL3::SDL3-static)
+
+# ---- first-run setup: the program builds st_game from the player's ROM itself (game_builder.cpp: the recompiler +
+# TinyCC, LGPL), into the data folder. Its headers and config go in toolchain/ next to the program. ----
+if(WIN32)
+  set(TCC_DIR ${CMAKE_SOURCE_DIR}/third_party/tinycc)
+  target_sources(SpiritTracks PRIVATE src/game_builder.cpp ${TCC_DIR}/libtcc.c)
+  set_source_files_properties(${TCC_DIR}/libtcc.c PROPERTIES COMPILE_OPTIONS "-w" COMPILE_DEFINITIONS "ONE_SOURCE=1")
+  set_source_files_properties(src/game_builder.cpp PROPERTIES INCLUDE_DIRECTORIES "${TCC_DIR}")
+  target_include_directories(SpiritTracks PRIVATE ${TCC_DIR}/config/windows)
+  target_link_libraries(SpiritTracks PRIVATE ntr_recomp)
+  target_compile_definitions(SpiritTracks PRIVATE ST_PC_SETUP=1)
+  set(ST_TOOLCHAIN $<TARGET_FILE_DIR:SpiritTracks>/toolchain)
+  add_custom_command(TARGET SpiritTracks POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory ${TCC_DIR}/include ${ST_TOOLCHAIN}/tcc/include
+    COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_SOURCE_DIR}/tools/ondevice/stdint.h ${CMAKE_SOURCE_DIR}/tools/ondevice/string.h ${ST_TOOLCHAIN}/tcc/include
+    COMMAND ${CMAKE_COMMAND} -E copy_directory ${TCC_DIR}/win32/lib ${ST_TOOLCHAIN}/tcc/lib
+    COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_SOURCE_DIR}/tools/ondevice/dllstart.c ${ST_TOOLCHAIN}/tcc/lib
+    COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/runtime/include ${ST_TOOLCHAIN}/rt
+    COMMAND ${CMAKE_COMMAND} -E copy_directory ${ST_CONFIG} ${ST_TOOLCHAIN}/config
+    VERBATIM)
+endif()
 if(ST_GLES_SHADERS)  # (the gles-test preset: the phone's renderer, its ES shaders and gles_compat, on the PC)
   target_sources(SpiritTracks PRIVATE src/gles_compat.cpp)
   target_compile_definitions(SpiritTracks PRIVATE ST_GLES_TEST=1)
