@@ -17,7 +17,7 @@ main 020270b4 replace ntr_nitro_init_context   # OS_InitContext (OS_func_0062)
 main 02022bf4 before st_perspective_aspect      # MTX_PerspectiveW (G3i_PerspectiveW_)
 # ...but the camera builds that matrix only when its field of view changes, and loads it every frame: the aspect is
 # also set on the way into the geometry engine (st_hooks.cpp).
-main 02024a14 before st_load_mtx44              # G3_LoadMtx44
+main 02024a14 instead st_load_mtx44             # G3_LoadMtx44 (the wide projection: the geometry engine's only)
 
 # IRQ dispatch: enters OS_IrqHandler_ThreadSwitch explicitly (frontend/src/st_hooks.cpp).
 itcm 01ffbd70 replace st_os_irq_handler        # OS_IrqHandler
