@@ -781,7 +781,7 @@ private:
                             (s_.held.load() & (ntr::KeyUp | ntr::KeyDown | ntr::KeyLeft | ntr::KeyRight)) != 0;
         map_input_quiet_ = moving ? 0 : std::min(map_input_quiet_ + 1, 1000);
         const bool map_off = frame.hud_absent >= 30 && map_input_quiet_ >= 60;
-        st::pad::map_hidden.store(map_off);
+        st::pad::map_hidden.store(map_off || dual_3d_);  // (two-screen 3D: both screens are shown, joined)
         if (v.top_shown != v.bottom_shown && st::pad::map_w.load() > 0 && st::pad::map_h.load() > 0 && !map_off) {
             const int layer = v.top_shown ? 1 : 0;
             const int layer_extra = layer_wide(layer) ? extra : 0;
