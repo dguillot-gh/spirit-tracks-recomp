@@ -56,14 +56,54 @@ bool thumb_jump_table(const Module& m, uint32_t addr, uint32_t rn, std::vector<u
     return !out.empty();
 }
 
+// An ARM data-processing immediate's value.
+static uint32_t arm_imm(uint32_t p) {
+    uint32_t imm = p & 0xFF, rot = ((p >> 8) & 15) * 2;
+    return rot ? (imm >> rot) | (imm << (32 - rot)) : imm;
+}
+
 // mwcc ARM switch:  cmp rX,#n; addls pc,pc,rX,lsl #2; b default; b case0; b case1; ...
 // Signed index:     cmp rX,#n; bgt default; cmp rX,#0; addge pc,pc,rX,lsl #2; b default; b case0; ...
+// Offset cases:     cmp rY,#hi; bgt default; subs rX,rY,#lo; addpl pc,pc,rX,lsl #2; b default; b case lo; ...
+//                   (cases lo..hi: Spirit Tracks 0206c9d8, entering Hyrule Castle took its case 1)
 bool arm_jump_table(const Module& m, uint32_t addr, uint32_t op, std::vector<uint32_t>& out) {
     uint32_t rm = op & 15;
-    const bool signed_index = (op >> 28) == 0xA;  // addge: the compare just before is the lower check
+    const uint32_t cond = op >> 28;
+    const bool signed_index = cond == 0xA;  // addge: the compare just before is the lower check
     int count = -1;
+    if (cond == 0x5) {  // addpl: the index is rY - lo, set by the subs just before; rY was checked against hi
+        if (addr < m.base + 4) return false;
+        const uint32_t s = m.read32(addr - 4);
+        if ((s & 0x0FF0F000) != (0x02500000 | (rm << 12))) return false;  // subs rm, rY, #lo
+        const uint32_t ry = (s >> 16) & 15, lo = arm_imm(s);
+        for (uint32_t back = 8; back <= 24 && addr >= m.base + back; back += 4) {
+            const uint32_t p = m.read32(addr - back);
+            if ((p & 0x0FFFF000) == (0x03500000 | (ry << 16))) {  // cmp rY, #hi; bgt default
+                if ((m.read32(addr - back + 4) & 0xFF000000) != 0xCA000000) return false;
+                const uint32_t hi = arm_imm(p);
+                if (hi < lo) return false;
+                count = int(hi - lo) + 1;
+                break;
+            }
+            if ((p & 0x0C000000) == 0 && ((p >> 12) & 15) == ry && !(((p >> 21) & 15) >= 8 && ((p >> 21) & 15) <= 11) &&
+                (p & 0x0E000090) != 0x00000090)
+                return false;  // rY rewritten in between
+        }
+        if (count <= 0 || count > 4096) return false;
+        for (int i = 0; i < count; i++) {
+            uint32_t t = addr + 8 + 4 * i;
+            if (!m.contains(t, 4)) return false;
+            out.push_back(t);
+        }
+        return true;
+    }
     for (uint32_t back = 4; back <= 20 && addr >= m.base + back; back += 4) {
         uint32_t p = m.read32(addr - back);
+        // An instruction that writes the index (data processing, not a compare) ends the search: a compare before it
+        // is about an older value (it gave 0206c9d8's addpl table one case).
+        if ((p & 0x0C000000) == 0 && ((p >> 12) & 15) == rm && !(((p >> 21) & 15) >= 8 && ((p >> 21) & 15) <= 11) &&
+            !(((p & 0x0E000090) == 0x00000090)))
+            return false;
         if ((p & 0x0FFFF000) == (0x03500000 | (rm << 16))) {  // cmp rm, #imm
             uint32_t imm = p & 0xFF, rot = ((p >> 8) & 15) * 2;
             imm = rot ? (imm >> rot) | (imm << (32 - rot)) : imm;

@@ -75,6 +75,15 @@ static void test_known_roms() {
         const ntr::KnownRom* r = ntr::find_known_rom(digest_of(hex));
         CHECK(r && std::string(r->game_code) == "BKIE" && r->supported);
     }
+    // Europe: Revision 0 and Revision 1 (several dumps) are BKIP, told apart by the revision (their own configs).
+    const ntr::KnownRom* eur = ntr::find_known_rom(digest_of("9e99cc803a14ce038eb908db585431f8254f09ee"));
+    CHECK(eur && std::string(eur->game_code) == "BKIP" && eur->supported && eur->revision == 0);
+    for (const char* hex : {"dcb221a89acb894503a461c2c7d4cfdad9a06b68", "b9096f46e9163750a9e3f6c2fc0758e6094b6135",
+                            "b0288a880498c12508e53f4373085eb88955e14b", "4efbff9a263fe622f3f7e7cfb7bea8046b86e57d",
+                            "52d7f22255d5d86fc40d3a43c7de969e0365ff7d"}) {
+        const ntr::KnownRom* r = ntr::find_known_rom(digest_of(hex));
+        CHECK(r && std::string(r->game_code) == "BKIP" && r->supported && r->revision == 1);
+    }
     const std::vector<uint8_t> junk(64, 0);
     CHECK(!ntr::find_known_rom(std::span<const uint8_t>(junk)));
     CHECK(!ntr::find_known_rom(digest_of("0000000000000000000000000000000000000000")));

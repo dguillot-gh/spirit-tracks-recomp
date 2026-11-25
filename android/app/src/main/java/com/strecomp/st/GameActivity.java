@@ -51,12 +51,15 @@ public class GameActivity extends SDLActivity {
         if (getIntent() != null && getIntent().getBooleanExtra("fps_probe", false)) args.add("--fps-probe");
         if (hardware && prefs.getBoolean("wide", false)) args.add("--wide");
         if (hardware && prefs.getInt("wide_mode", 1) == 2) args.add("--wide21");
+        if (hardware && prefs.getInt("wide_mode", 1) == 3) args.add("--wide1610");
         final String[] textures = {"pixels", "smooth", "sharp"};
         args.add("--textures");
         args.add(textures[Math.max(0, Math.min(2, prefs.getInt("textures", 0)))]);
         args.add("--fixes");
         args.add("0");
         if (prefs.getBoolean("hd_text", false)) args.add("--hd-text");
+        args.add("--language");
+        args.add(prefs.getString("language", "auto"));
         return args.toArray(new String[0]);
     }
 
@@ -145,7 +148,7 @@ public class GameActivity extends SDLActivity {
         StInput.nativeSetStretch(prefs.getBoolean("stretch", false));
         StInput.nativeSetStickMode(pad.stickMode());
         final int wideMode = prefs.getBoolean("wide", false) && prefs.getBoolean("gpu", true)
-                ? Math.max(1, Math.min(2, prefs.getInt("wide_mode", 1))) : 0;
+                ? Math.max(1, Math.min(3, prefs.getInt("wide_mode", 1))) : 0;
         pad.setWide(wideMode);
         StInput.nativeSetWide(wideMode);
         if (portrait()) pad.setScreen(StInput.SCREEN_BOTH);

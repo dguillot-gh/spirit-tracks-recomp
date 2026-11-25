@@ -13,12 +13,18 @@ program and Android app, set up for Spirit Tracks.
 
 *On a Moto G Stylus 2025: 21:9 widescreen, HD text, and the minimap of the top screen in the corner.*
 
+![A Spirit Tracks cutscene at 21:9 on an Android phone: the scene fills the whole width, the game's letterbox bars only above and below](docs/images/phone-21x9-cutscene.jpg)
+
+*Cutscenes in widescreen too: the scene fills the whole 21:9 width, with the game's own letterbox bars above and below.*
+
 ## Features
 
 **Picture**
 - Software, OpenGL and Compute renderers: 2x-8x on a PC, up to 4x on a phone
-- Widescreen 16:9 and 21:9: the 3D fills the screen, the HUD (hearts, timer, Menu button, the train's lever and horn
-  cord) sits at the picture's edges and still answers touches there
+- Widescreen 16:10 (Steam Deck, tablets), 16:9 and 21:9: the 3D fills the screen, actors are drawn across the whole
+  wide picture (no pop-in at the sides), cutscenes fill it too (the game's letterbox spans the width), and the HUD
+  (hearts, timer, Menu button, the train's lever and horn cord) sits at the picture's edges and still answers touches
+  there
 - HD text: dialogue, choices and labels drawn with a vector font at the screen's own resolution, kept with save states
   (from Phantom Hourglass Recomp, by chouette-cc)
 - Sharp or smooth filtering; the DS's shape or stretched
@@ -28,6 +34,12 @@ program and Android app, set up for Spirit Tracks.
   ROM by default, so the D-pad controls work with the clean dump too; the QoL changes come with the QoL ROM)
 - D-pad movement and an analog stick (on-screen or a gamepad's left stick): walk with a light push, run at the rim
 - 12 save-state slots with pictures, plus Continue from where you quit
+- Language: Auto (the system's), English, French or Spanish, the three the USA ROM carries, plus German and Italian
+  with a European ROM; in the PC menu, the phone's settings, `settings.ini` or `--language` (applies at the next start
+  from the title screen, not Continue) (from Phantom Hourglass Recomp, by chouette-cc)
+- **Europe (test):** a European dump (Revision 0 or 1) builds with `-Variant eur`. Its addresses come from the
+  zeldaret/st decomp, not yet tried on a real European ROM: reports welcome. Touch controls only (the D-pad patch is
+  USA only).
 - Touch, keyboard and gamepad; microphone and Spirit Flute blow buttons (no real microphone needed)
 
 **Phone**
@@ -38,6 +50,8 @@ program and Android app, set up for Spirit Tracks.
 - 120 Hz (or 60 Hz) display mode and Android's performance hint, for a steady 60 fps
 
 Tested devices, measurements and known issues: [TESTING.md](TESTING.md).
+
+Ideas and features being considered next: [docs/WISHLIST.md](docs/WISHLIST.md).
 
 ## What you need
 
@@ -53,10 +67,70 @@ Tested devices, measurements and known issues: [TESTING.md](TESTING.md).
   | USA, D-pad patch v0.9c | `6a63d88702c34da626e273dfca4931d52ac4551b` |
   | USA, D-pad + QoL patch v0.9c | `6896c1db2b3a725cb991f711a875fc2228b7620e` |
 
+- Or, in test: *Legend of Zelda, The - Spirit Tracks (Europe) (En,Fr,De,Es,It)*, Revision 0
+  (`9e99cc803a14ce038eb908db585431f8254f09ee`) or Revision 1 (`dcb221a89acb894503a461c2c7d4cfdad9a06b68`,
+  `b9096f46e9163750a9e3f6c2fc0758e6094b6135`, `b0288a880498c12508e53f4373085eb88955e14b`,
+  `4efbff9a263fe622f3f7e7cfb7bea8046b86e57d` or `52d7f22255d5d86fc40d3a43c7de969e0365ff7d`), built with
+  `-Variant eur` (each script takes it, e.g. `RUN-ALL.ps1 -Variant eur`). An APK plays the revision it was built from.
+
 - Windows 10/11 64-bit, about 10 GB of disk, and an OpenGL 3.3 GPU for the GPU renderers.
 - For Android: an Android 8+ arm64 phone (OpenGL ES 3.2 for the GPU renderers) and a USB cable.
 
+## Quick start (new to this?)
+
+You build the game on a Windows PC from your own copy of the game. It takes about an hour the first time, mostly
+waiting. Step by step:
+
+1. **Install Git** (to download this project): open the Start menu, type `PowerShell`, open it, and paste this line
+   (right-click pastes), then press Enter:
+   ```powershell
+   winget install --id Git.Git -e
+   ```
+   Close PowerShell and open it again afterwards.
+2. **Make a folder for everything**, for example `C:\Games\st-workspace`, and inside it a folder named `roms`. Put
+   your Spirit Tracks dump (USA) in `roms` (any file name).
+3. **For the D-pad controls and the analog stick** (recommended): put d0k3's patch folder `loz_st_dpad_qol-v0.9c` in
+   `roms\patches\`. Without it you get the original game, touch controls only.
+4. **Download the project** into that folder. In PowerShell, paste these two lines (change the path if you used another
+   folder):
+   ```powershell
+   cd C:\Games\st-workspace
+   git clone --recurse-submodules https://github.com/dguillot-gh/spirit-tracks-recomp.git st-recomp
+   ```
+   Don't use GitHub's green "Download ZIP" button: the ZIP leaves out melonDS, and the build then fails.
+   The folder should now look like this:
+   ```
+   C:\Games\st-workspace\
+     st-recomp\                              (the project)
+     roms\your-dump.nds                      (your game)
+     roms\patches\loz_st_dpad_qol-v0.9c\     (the patch, if you have it)
+   ```
+5. **Build it** (installs the build tools the first time; Windows asks for admin once):
+   ```powershell
+   powershell -NoProfile -ExecutionPolicy Bypass -File st-recomp\scripts\RUN-ALL.ps1
+   ```
+   Without the patch, add `-Variant clean` at the end. When it says it's done, open
+   `C:\Games\st-workspace\games\SpiritTracks\` (`SpiritTracks-Clean\` without the patch) and double-click
+   `SpiritTracks.exe` (`PLAY.cmd` does the same). That folder is the whole game: move it anywhere you like.
+6. **For an Android phone:**
+   - Turn on USB debugging once: Settings → About phone → tap **Build number** seven times; then Settings → System →
+     Developer options → **USB debugging** on.
+   - Plug the phone into the PC with a USB cable and tap **Allow** on the phone when it asks.
+   - In the same PowerShell window (add `-Variant clean` here too if you built without the patch):
+     ```powershell
+     powershell -NoProfile -ExecutionPolicy Bypass -File st-recomp\scripts\RUN-ANDROID.ps1
+     ```
+     It builds the app, installs it and copies your game in. Without a cable, add `-NoPhone`: it only makes the app (in
+     `apks\`); copy that file to the phone, tap it to install, and pick your ROM on the app's start screen.
+
+**If something goes wrong:** the script stops with a `FAIL` line that says what's missing. Every step's full output is
+in the `logs\spirit-tracks\` folder; attach the newest log when you [open an issue](../../issues). Don't attach your ROM
+or the patch.
+
 ## Building
+
+The short version, for people who already use Git and PowerShell.
+
 
 Put the repository, your ROM and the patch side by side:
 
@@ -128,7 +202,7 @@ host fibers, and its anti-piracy checks (DS Protect) are answered as a genuine c
 
 Recompiler and runtime from [FFCCEOT-Recomp](https://github.com/JonathanDC64/FFCCEOT-Recomp) by JonathanDC64; DS
 hardware from [melonDS](https://github.com/melonDS-emu/melonDS); function boundaries from the
-[zeldaret/st](https://github.com/zeldaret/st) decompilation; HD text from
+[zeldaret/st](https://github.com/zeldaret/st) decompilation; HD text, the language selector and the European ROM support from
 [chouette-cc](https://github.com/chouette-cc)'s work on Phantom Hourglass Recomp; the Inter font by Rasmus Andersson.
 The D-pad and QoL patches are by d0k3 and Greiga Master / StraDaMa (not included). Details in [NOTICE.md](NOTICE.md).
 

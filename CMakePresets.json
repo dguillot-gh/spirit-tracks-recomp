@@ -49,6 +49,11 @@
       "inherits": "release"
     },
     {
+      "name": "release-eur",
+      "displayName": "Release, European ROM (clang-cl)",
+      "inherits": "release"
+    },
+    {
       "name": "linux-release",
       "displayName": "Release (Linux clang)",
       "inherits": "base",
@@ -90,6 +95,10 @@
     {
       "name": "release-clean",
       "configurePreset": "release-clean"
+    },
+    {
+      "name": "release-eur",
+      "configurePreset": "release-eur"
     },
     {
       "name": "linux-release",

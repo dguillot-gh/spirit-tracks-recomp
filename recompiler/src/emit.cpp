@@ -13,6 +13,10 @@
 
 #include "recomp/recomp.hpp"
 
+namespace {
+constexpr size_t kMaxProbes = 8;  // NTR_MAX_PROBES in runtime/include/ntr/recomp.h: keep the two equal
+}
+
 namespace recomp {
 
 namespace {
@@ -813,12 +817,19 @@ EmitStats emit_c(const Program& program, const Analysis& analysis, const std::fi
             const auto differs = [&](const Module* p, uint32_t addr, uint32_t val) {
                 return p->contains(addr, 4) && p->read32(addr) != val;
             };
-            // Greedy: the word that tells the most remaining modules apart, until every one is told apart. Then
-            // again from the start with the words left, so that up to four probes give a second, independent check.
+            // Greedy: the word that tells the most remaining modules apart, until every one is told apart (up to
+            // NTR_MAX_PROBES words). Then again from the start with the words left, until there are four, so that
+            // they give a second, independent check. A large overlay overlaps many others: with four words only, the
+            // greedy choice could spend them all on its end and leave the overlays sharing its start untold, which
+            // then counted as resident over them (Spirit Tracks: ov026 over ov031, whose Heart actor then never
+            // registered, and the game crashed on the next heart drop).
             std::vector<std::pair<uint32_t, uint32_t>> probes;
             std::vector<const Module*> left = others;
-            while (probes.size() < 4 && !others.empty()) {
-                if (left.empty()) left = others;
+            while (probes.size() < kMaxProbes && !others.empty()) {
+                if (left.empty()) {
+                    if (probes.size() >= 4) break;
+                    left = others;
+                }
                 uint32_t best_addr = 0, best_val = 0;
                 size_t best = 0;
                 for (uint32_t w = 0; w < words; w++) {

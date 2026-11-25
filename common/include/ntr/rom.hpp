@@ -145,6 +145,7 @@ struct KnownRom {
     const char* region;
     const char* description;
     bool supported;
+    uint8_t revision = 0;  // the header's ROM version (0x1E): releases with one game code but different code
 };
 
 std::span<const KnownRom> known_roms();

@@ -2,9 +2,9 @@
 #   ANDROID-TOOLS.ps1     Java 17 and the Android SDK, once (asks you to accept Android's SDK licence)
 #   5-BUILD-ANDROID.ps1   the APK (apks\SpiritTracks-<variant>-latest.apk)
 #   6-INSTALL-PHONE.ps1   install, copy the ROM and (only if the phone has none) a save, open the app
-#   powershell -NoProfile -ExecutionPolicy Bypass -File RUN-ANDROID.ps1 [-DryRun] [-NoPhone] [-Variant qol|dpad|clean]
+#   powershell -NoProfile -ExecutionPolicy Bypass -File RUN-ANDROID.ps1 [-DryRun] [-NoPhone] [-Variant qol|dpad|clean|eur]
 [CmdletBinding()]
-param([switch] $DryRun, [switch] $NoPhone, [ValidateSet('', 'qol', 'dpad', 'clean')] [string] $Variant = '')
+param([switch] $DryRun, [switch] $NoPhone, [ValidateSet('', 'qol', 'dpad', 'clean', 'eur')] [string] $Variant = '')
 . (Join-Path $PSScriptRoot 'st-common.ps1')
 
 $steps = @('ANDROID-TOOLS.ps1')

@@ -1,5 +1,20 @@
 # Spirit Tracks: the recompiled game (st_game, from the player's ROM) and the program (SpiritTracks).
-set(ST_CONFIG ${CMAKE_CURRENT_SOURCE_DIR}/config/bkie)
+# The recompiler's config from the ROM's header: game code at 0x0C (BKIE = USA, BKIP = Europe) and, for Europe, the ROM
+# version at 0x1E (Revision 0: config/bkip, Revision 1: config/bkip1; their overlays differ).
+set(ST_CONFIG_CODE "bkie")
+if(ST_ROM AND EXISTS "${ST_ROM}")
+  file(READ "${ST_ROM}" ST_ROM_CODE_HEX OFFSET 12 LIMIT 4 HEX)
+  file(READ "${ST_ROM}" ST_ROM_VERSION_HEX OFFSET 30 LIMIT 1 HEX)
+  if(ST_ROM_CODE_HEX STREQUAL "424b4950")      # BKIP (Europe)
+    if(ST_ROM_VERSION_HEX STREQUAL "00")
+      set(ST_CONFIG_CODE "bkip")
+    else()
+      set(ST_CONFIG_CODE "bkip1")
+    endif()
+  endif()
+  message(STATUS "Spirit Tracks config: ${ST_CONFIG_CODE}")
+endif()
+set(ST_CONFIG ${CMAKE_CURRENT_SOURCE_DIR}/config/${ST_CONFIG_CODE})
 
 # Embedded HD font (Inter Bold, SIL OFL 1.1) for optional vector text rendering.
 set(ST_HD_FONT_SRC ${CMAKE_CURRENT_BINARY_DIR}/hd_font_data.cpp)

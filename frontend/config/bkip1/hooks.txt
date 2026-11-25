@@ -1,0 +1,46 @@
+# Recompiler hooks for BKIP (Spirit Tracks, Europe, Rev 1).
+# Format: <module> <address> replace|before|instead <c_function>
+#   replace: the recompiled body is replaced by a call to the C function.
+#   before:  the C function is called on entry, then the recompiled body runs.
+#   instead: the C function (returning int) is called on entry; the recompiled body runs if it returns 0.
+# The decomp leaves these NitroSDK functions unnamed (OS_func_0062..0064, func_01ffbd70); each was matched to Phantom
+# Addresses mapped from BKIE's through the zeldaret/st symbol names (config/usa vs config/eur1); every function has the USA one's size.
+# Hourglass's by size, order and literals (ST-PORT.md).
+
+# NitroSDK thread context switches: guest threads run on host fibers (runtime/src/nitro.cpp).
+main 02027120 replace ntr_nitro_save_context   # OS_SaveContext (OS_func_0063)
+main 0202716c replace ntr_nitro_load_context   # OS_LoadContext (OS_func_0064)
+main 020270b4 replace ntr_nitro_init_context   # OS_InitContext (OS_func_0062)
+
+# Widescreen: the projection's aspect ratio, in NitroSDK's G3i_PerspectiveW_ (r2 = aspect, 0x1555 = 4:3). Unnamed in
+# the decomp; matched to Phantom Hourglass's (0x02005bfc): the same arguments, the hardware divider, the same scaling.
+main 02022bf4 before st_perspective_aspect      # MTX_PerspectiveW (G3i_PerspectiveW_)
+# ...but the camera builds that matrix only when its field of view changes, and loads it every frame: the aspect is
+# also set on the way into the geometry engine (st_hooks.cpp).
+main 02024a14 before st_load_mtx44              # G3_LoadMtx44
+# ...and the camera's view planes, which decide which actors are drawn, take in the wide picture (st_hooks.cpp).
+ov000 020764f4 before st_camera_planes           # func_ov000_020764c0: the camera's view planes
+
+# IRQ dispatch: enters OS_IrqHandler_ThreadSwitch explicitly (frontend/src/st_hooks.cpp).
+itcm 01ffbd70 replace st_os_irq_handler        # OS_IrqHandler
+
+# Optional HD vector text (frontend/src/st_text.cpp, from Phantom Hourglass's): the OBJ text canvases, their glyphs and
+# where their boxes are drawn. The SDK routines are named by zeldaret/st; func_02009b18 matches Phantom Hourglass's
+# NNS_G2dApplyOamManagerToProxy; the text object is UnkSystem2_UnkSubSystem11_Derived1 (overlay 0).
+main 02008b58 before  st_text_obj_init         # NNS_G2dCharCanvasInitForOBJ1D
+ov000 02062144 before st_text_obj_deinit       # UnkSystem2_UnkSubSystem11_Derived1: release (func_ov000_02062144)
+main 02008590 before  st_text_clear            # ClearContinuous (an OBJ canvas's whole clear)
+ov000 02061eb8 before st_text_obj_clear        # UnkSystem2_UnkSubSystem11_Base::vfunc_0C: fills the canvas (next page)
+main 020087f8 before  st_text_clear_area       # ClearArea1D
+main 02008a0c instead st_text_draw_char        # NNS_G2dCharCanvasDrawChar
+ov000 0206216c before st_text_obj_draw         # UnkSystem2_UnkSubSystem11_Derived1: draw (func_ov000_0206216c)
+ov000 02062228 before st_text_obj_draw         # ...its clipped draw (func_ov000_02062228; reached through a pointer)
+main 02009b18 before  st_text_oam_flush        # func_02009b18 (NNS_G2dApplyOamManagerToProxy)
+
+# DS Protect (overlay 1, encrypted in the ROM): report a genuine cartridge (frontend/src/st_hooks.cpp).
+ov001 020c0e74 replace st_dsprot_detect        # DSProt_DetectFlashcart
+ov001 020c0eec replace st_dsprot_detect_not    # DSProt_DetectNotFlashcart
+ov001 020c0f64 replace st_dsprot_detect        # DSProt_DetectEmulator
+ov001 020c0fdc replace st_dsprot_detect_not    # DSProt_DetectNotEmulator
+ov001 020c1054 replace st_dsprot_detect        # DSProt_DetectDummy
+ov001 020c10cc replace st_dsprot_detect_not    # DSProt_DetectNotDummy

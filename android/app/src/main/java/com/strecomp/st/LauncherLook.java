@@ -204,6 +204,31 @@ final class LauncherLook {
 
     // ---- settings (the ones every DS port reads at start; the in-game menu has the rest) ----
 
+    // The firmware language the game plays in (the USA ROM carries English, French and Spanish). Ported from Phantom
+    // Hourglass Recomp's language selector by Chouette (PRs #6 and #8).
+    // The European ROM (BKIP) also carries German and Italian.
+    private static final String[] USA_LANG_VALUES = {"auto", "en", "fr", "es"};
+    private static final String[] USA_LANG_LABELS = {"Auto (system)", "English", "Français", "Español"};
+    private static final String[] EUR_LANG_VALUES = {"auto", "en", "fr", "de", "it", "es"};
+    private static final String[] EUR_LANG_LABELS = {"Auto (system)", "English", "Français", "Deutsch", "Italiano", "Español"};
+
+    /** True when the installed ROM's header carries game code BKIP (Europe: En,Fr,De,Es,It). */
+    static boolean isEuropeRom(java.io.File filesDir) {
+        final java.io.File f = new java.io.File(filesDir, "rom/bkie.nds");  // (the app's name for any release's ROM)
+        if (!f.isFile() || f.length() < 16) return false;
+        try (java.io.FileInputStream in = new java.io.FileInputStream(f)) {
+            final byte[] hdr = new byte[16];
+            if (in.read(hdr) == 16) return hdr[12] == 'B' && hdr[13] == 'K' && hdr[14] == 'I' && hdr[15] == 'P';
+        } catch (java.io.IOException ignored) {
+        }
+        return false;
+    }
+
+    private static int langIndex(String[] values, String code) {
+        for (int i = 0; i < values.length; i++) if (values[i].equals(code)) return i;
+        return 0;
+    }
+
     /** "GPU · 2× · smooth" from the game's settings. */
     static String summary(SharedPreferences p, boolean gpuDefault) {
         boolean gpu = p.getBoolean("gpu", gpuDefault);
@@ -213,6 +238,8 @@ final class LauncherLook {
         if (p.getBoolean("hd_text", false)) b.append(" · HD text");
         if (p.getBoolean("stretch", false)) b.append(" · stretched");
         b.append(p.getBoolean("portrait", false) ? " · upright" : " · sideways");
+        String lang = p.getString("language", "auto");
+        if (!"auto".equals(lang)) b.append(" · ").append(lang.toUpperCase(java.util.Locale.US));
         return b.toString();
     }
 
@@ -220,9 +247,14 @@ final class LauncherLook {
     void settings(SharedPreferences p, boolean gpuDefault, Runnable changed) {
         final boolean gpu = p.getBoolean("gpu", gpuDefault);
         final int scale = Math.max(1, Math.min(4, p.getInt("scale", 2)));
+        final boolean eur = isEuropeRom(a.getFilesDir());
+        final String[] langValues = eur ? EUR_LANG_VALUES : USA_LANG_VALUES;
+        final String[] langLabels = eur ? EUR_LANG_LABELS : USA_LANG_LABELS;
+        final int lang = langIndex(langValues, p.getString("language", "auto"));
         String[] items = {
                 "Renderer: " + (gpu ? "GPU" : "Software"),
                 "Resolution: " + scale + "×" + (gpu ? "" : " (GPU only)"),
+                "Language: " + langLabels[lang],
                 (p.getBoolean("smooth", false) ? "✓ " : "   ") + "Smooth picture",
                 (p.getBoolean("hd_text", false) ? "✓ " : "   ") + "HD dialogue text",
                 (p.getBoolean("stretch", false) ? "✓ " : "   ") + "Stretch to fill the screen",
@@ -230,7 +262,7 @@ final class LauncherLook {
                 "Choose background image…",
                 hasCustomBackground() ? "Use the game's cover again" : null,
         };
-        int n = items[7] == null ? 7 : 8;
+        int n = items[8] == null ? 8 : 9;
         String[] shown = java.util.Arrays.copyOf(items, n);
         dialog().setTitle("Settings").setItems(shown, (d, w) -> {
             switch (w) {
@@ -245,12 +277,21 @@ final class LauncherLook {
                     }).setNegativeButton("Back", null).show();
                     return;
                 }
-                case 2: p.edit().putBoolean("smooth", !p.getBoolean("smooth", false)).apply(); break;
-                case 3: p.edit().putBoolean("hd_text", !p.getBoolean("hd_text", false)).apply(); break;
-                case 4: p.edit().putBoolean("stretch", !p.getBoolean("stretch", false)).apply(); break;
-                case 5: p.edit().putBoolean("portrait", !p.getBoolean("portrait", false)).apply(); break;
-                case 6: pickBackground(); return;
-                case 7: clearBackground(); changed.run(); return;
+                case 2: {
+                    dialog().setTitle("Language").setSingleChoiceItems(langLabels, lang, (x, which) -> {
+                        x.dismiss();
+                        p.edit().putString("language", langValues[which]).apply();
+                        changed.run();
+                        settings(p, gpuDefault, changed);
+                    }).setNegativeButton("Back", null).show();
+                    return;
+                }
+                case 3: p.edit().putBoolean("smooth", !p.getBoolean("smooth", false)).apply(); break;
+                case 4: p.edit().putBoolean("hd_text", !p.getBoolean("hd_text", false)).apply(); break;
+                case 5: p.edit().putBoolean("stretch", !p.getBoolean("stretch", false)).apply(); break;
+                case 6: p.edit().putBoolean("portrait", !p.getBoolean("portrait", false)).apply(); break;
+                case 7: pickBackground(); return;
+                case 8: clearBackground(); changed.run(); return;
                 default: return;
             }
             changed.run();

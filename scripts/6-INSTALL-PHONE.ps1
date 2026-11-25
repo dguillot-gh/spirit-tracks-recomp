@@ -5,9 +5,9 @@
 #   - copies a save into the app ONLY if the app has none yet: the PC game folder's (SpiritTracks\data\saves),
 #     else your melonDS .ml1.sav. A save already on the phone is never replaced.
 #   - opens the app
-#   powershell -NoProfile -ExecutionPolicy Bypass -File 6-INSTALL-PHONE.ps1 [-DryRun] [-Variant qol|dpad|clean]
+#   powershell -NoProfile -ExecutionPolicy Bypass -File 6-INSTALL-PHONE.ps1 [-DryRun] [-Variant qol|dpad|clean|eur]
 [CmdletBinding()]
-param([switch] $DryRun, [ValidateSet('', 'qol', 'dpad', 'clean')] [string] $Variant = '')
+param([switch] $DryRun, [ValidateSet('', 'qol', 'dpad', 'clean', 'eur')] [string] $Variant = '')
 . (Join-Path $PSScriptRoot 'st-common.ps1')
 
 $apk = Join-Path $ApkDir "SpiritTracks-$Variant-latest.apk"

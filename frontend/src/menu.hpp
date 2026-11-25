@@ -33,11 +33,14 @@ struct MenuState {
     bool stretch = false;      // the picture stretched over the window
     std::string resume_time;   // when the resume state (Continue) was written ("" = none)
     bool stick = false;        // a gamepad's left stick moves Link as an analog stick (else it is the D-pad)
-    bool wide = false;         // widescreen 16:9 (a test; GPU and Compute renderers)
+    bool wide = false;         // widescreen (GPU and Compute renderers)
+    int wide_mode = 1;         // with wide: 1 16:9, 2 21:9, 3 16:10
     int textures = 0;          // the 3D's textures (GPU renderer): 0 the DS's pixels, 1 smooth, 2 sharp
     int fixes = 0;             // 3D fixes, bits: 1 fewer seams (GPU renderer), 2 stable textures
     bool compute = false;      // with gpu: the compute-shader renderer (texture filtering is unavailable)
     bool hd_text = false;      // HD vector dialogue text (Inter Bold TrueType font)
+    int language = -1;         // DS firmware language: -1 auto (system locale), 1 EN, 2 FR, 3 DE, 4 IT, 5 ES
+    bool europe = false;       // a BKIP (Europe) ROM: also carries German and Italian
 };
 
 enum class MenuResult { None, Changed, Quit, SaveState, LoadState, Continue };

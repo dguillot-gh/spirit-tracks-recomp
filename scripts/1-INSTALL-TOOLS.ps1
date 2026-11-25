@@ -2,9 +2,9 @@
 #   Git, Python 3, CMake 3.28+, Ninja, LLVM (clang-cl), Visual Studio 2022 Build Tools with the C++ workload and the
 #   Windows SDK (added on its own when Build Tools is there without it).
 # Uses winget. Build Tools asks for admin once and downloads about 3 GB. Tools already installed are skipped.
-#   powershell -NoProfile -ExecutionPolicy Bypass -File 1-INSTALL-TOOLS.ps1 [-DryRun] [-Variant qol|dpad|clean]
+#   powershell -NoProfile -ExecutionPolicy Bypass -File 1-INSTALL-TOOLS.ps1 [-DryRun] [-Variant qol|dpad|clean|eur]
 [CmdletBinding()]
-param([switch] $DryRun, [ValidateSet('', 'qol', 'dpad', 'clean')] [string] $Variant = '')
+param([switch] $DryRun, [ValidateSet('', 'qol', 'dpad', 'clean', 'eur')] [string] $Variant = '')
 . (Join-Path $PSScriptRoot 'st-common.ps1')
 
 $missing = @(Get-MissingTools)

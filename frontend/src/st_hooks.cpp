@@ -1,4 +1,4 @@
-// Spirit Tracks's hooks (frontend/config/bkie/hooks.txt): the NitroSDK routines the runtime replaces, and DS Protect.
+// Spirit Tracks's hooks (frontend/config/<code>/hooks.txt): the NitroSDK routines the runtime replaces, and DS Protect.
 #include "st_hooks.hpp"
 #include "st_text.hpp"
 
@@ -15,11 +15,12 @@
 namespace {
 // BKIE (USA). The decomp (zeldaret/st) leaves the NitroSDK ones unnamed (OS_func_00nn); each was matched to Phantom
 // Hourglass's (same SDK): the same sizes in the same order, and the same literals (ST-PORT.md, "Addresses").
-struct Addresses {
-    uint32_t os_irq_table;                  // OS_IRQTable (DTCM): the literal OS_IrqHandler loads
-    uint32_t os_irq_handler_thread_switch;  // OS_IrqHandler_ThreadSwitch (ITCM): the LR OS_IrqHandler sets
-};
-constexpr Addresses kUsa = {0x027E0198, 0x01FFBDC8};
+// BKIP (Europe, Revision 0 and 1): the same symbols in the decomp's config/eur and config/eur1 (main's bss sits 0x20
+// higher; overlay 0 differs between the two revisions). Mapped by name, not tested on a European ROM yet.
+using st::Addresses;
+constexpr Addresses kUsa = {0x027E0198, 0x01FFBDC8, 0x0204AEFC, 0x0204C38C, 0x0204AEDC, 0x02078678, 0x020764A0};
+constexpr Addresses kEur = {0x027E0198, 0x01FFBDC8, 0x0204AF1C, 0x0204C3AC, 0x0204AEFC, 0x02078698, 0x020764C0};
+constexpr Addresses kEur1 = {0x027E0198, 0x01FFBDC8, 0x0204AF1C, 0x0204C3AC, 0x0204AEFC, 0x020786CC, 0x020764F4};
 const Addresses* A = &kUsa;
 }  // namespace
 
@@ -61,6 +62,26 @@ extern "C" void st_load_mtx44(NtrCpu* c) {
     if (want != 0x1555u) ffcc_wide_scene = 8;
 }
 
+// Overlay 0 0x020764A0 (func_ov000_020764c0), `before`: the camera builds its view planes, which decide which actors
+// are drawn, from its field of view and the DS's shape: one pair of planes is the other scaled by 3/4 (192 / 256), a
+// value the function computes once into a table, with its square (two "done" bits guard them). In widescreen NPCs,
+// grass and signs then popped in and out at the sides. Here the table holds the picture's own 1 / aspect (and its
+// square) and the "done" bits are set, so the planes take in the whole wide picture; back in 4:3, the DS's 3/4. The
+// table and the bits are found in the function's literal pool (+0x1C8, +0x1CC; the same function in every release).
+extern "C" void st_camera_planes(NtrCpu* c) {
+    const uint32_t fn = A->camera_planes;
+    const uint32_t guards = ntr_rd32(c, fn + 0x1C8), table = ntr_rd32(c, fn + 0x1CC);
+    if (guards - 0x02000000u >= 0x400000u || table - 0x02000000u >= 0x400000u) return;  // (not the expected code)
+    const uint32_t aspect = ffcc_wide_block == 0 ? g_aspect.load(std::memory_order_relaxed) : 0x1555u;
+    const uint32_t inv = uint32_t((4096u * 4096u + aspect / 2) / aspect);  // 4.12: 0x0C00 at 4:3
+    if (ntr_rd32(c, table + 4) != inv) {
+        ntr_wr32(c, table + 4, inv);
+        ntr_wr32(c, table + 0, (inv * inv + 0x800u) >> 12);
+    }
+    ntr_wr32(c, guards + 12, ntr_rd32(c, guards + 12) | 1u);
+    ntr_wr32(c, guards + 8, ntr_rd32(c, guards + 8) | 1u);
+}
+
 // ITCM 0x01FFBD70: OS_IrqHandler.
 extern "C" void st_os_irq_handler(NtrCpu* c) { ntr::nitro::irq_handler(c, A->os_irq_table, A->os_irq_handler_thread_switch); }
 
@@ -77,9 +98,13 @@ extern "C" void st_dsprot_detect_not(NtrCpu* c) {
 
 namespace st {
 
-bool select_release(const std::string& game_code) {
-    if (game_code != "BKIE") return false;
-    A = &kUsa;
+const Addresses& addresses() { return *A; }
+
+bool select_release(const std::string& game_code, int revision) {
+    if (game_code == "BKIE") A = &kUsa;
+    else if (game_code == "BKIP" && revision == 0) A = &kEur;
+    else if (game_code == "BKIP" && revision == 1) A = &kEur1;
+    else return false;
     return true;
 }
 
@@ -91,6 +116,7 @@ void* find_hook(const char* name) {
         {"st_os_irq_handler", reinterpret_cast<void*>(&st_os_irq_handler)},
         {"st_perspective_aspect", reinterpret_cast<void*>(&st_perspective_aspect)},
         {"st_load_mtx44", reinterpret_cast<void*>(&st_load_mtx44)},
+        {"st_camera_planes", reinterpret_cast<void*>(&st_camera_planes)},
         {"st_dsprot_detect", reinterpret_cast<void*>(&st_dsprot_detect)},
         {"st_dsprot_detect_not", reinterpret_cast<void*>(&st_dsprot_detect_not)},
         {"st_stick_move", reinterpret_cast<void*>(&st_stick_move)},

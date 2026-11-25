@@ -40,6 +40,12 @@ KNOWN_ROM_SHA1 = {
     "1f0921b5e99db9d92d24710f1b004e4f3c997b73",  # Spirit Tracks (USA, Australia)
     "6a63d88702c34da626e273dfca4931d52ac4551b",  # Spirit Tracks (USA), D-pad patch v0.9c
     "6896c1db2b3a725cb991f711a875fc2228b7620e",  # Spirit Tracks (USA), D-pad + QoL patch v0.9c
+    "9e99cc803a14ce038eb908db585431f8254f09ee",  # Spirit Tracks (Europe)
+    "dcb221a89acb894503a461c2c7d4cfdad9a06b68",  # Spirit Tracks (Europe) (Rev 1), the dumps zeldaret/st lists
+    "b9096f46e9163750a9e3f6c2fc0758e6094b6135",
+    "b0288a880498c12508e53f4373085eb88955e14b",
+    "4efbff9a263fe622f3f7e7cfb7bea8046b86e57d",
+    "52d7f22255d5d86fc40d3a43c7de969e0365ff7d",
 }
 
 # Marker the recompiler writes at the top of every generated file.

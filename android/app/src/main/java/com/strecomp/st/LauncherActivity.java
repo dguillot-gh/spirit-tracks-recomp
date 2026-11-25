@@ -39,13 +39,36 @@ import java.util.Locale;
  */
 public final class LauncherActivity extends Activity {
     private static final int PICK_ROM = 1, PICK_SAVE = 2, EXPORT_SAVE = 3, PICK_MODULE = 4;
-    // Spirit Tracks (USA): the clean dump and the D-pad and D-pad + QoL patches made from it share one recompiled game
-    // (common/src/known_roms.cpp), so the app takes any of them. BuildConfig.ROM_SHA1 is the one the game was built from.
-    private static final String[] KNOWN = {
+    // The dumps that share one recompiled game (common/src/known_roms.cpp). USA: the clean dump and the D-pad and
+    // D-pad + QoL patches made from it. Europe: Revision 0, or Revision 1 (several dumps); the two revisions differ in
+    // code, so each is its own build. The app takes the group of the ROM it was built from (BuildConfig.ROM_SHA1).
+    private static final String[] USA = {
             "1f0921b5e99db9d92d24710f1b004e4f3c997b73",  // clean (USA, Australia) (En,Fr,Es)
             "6a63d88702c34da626e273dfca4931d52ac4551b",  // D-pad patch v0.9c
             "6896c1db2b3a725cb991f711a875fc2228b7620e",  // D-pad + QoL patch v0.9c
     };
+    private static final String[] EUROPE = {
+            "9e99cc803a14ce038eb908db585431f8254f09ee",  // (Europe) (En,Fr,De,Es,It)
+    };
+    private static final String[] EUROPE_REV1 = {
+            "dcb221a89acb894503a461c2c7d4cfdad9a06b68",  // (Europe) (En,Fr,De,Es,It) (Rev 1), the dumps zeldaret/st lists
+            "b9096f46e9163750a9e3f6c2fc0758e6094b6135",
+            "b0288a880498c12508e53f4373085eb88955e14b",
+            "4efbff9a263fe622f3f7e7cfb7bea8046b86e57d",
+            "52d7f22255d5d86fc40d3a43c7de969e0365ff7d",
+    };
+    private static final String[] KNOWN = known();
+
+    private static String[] known() {
+        for (String[] group : new String[][] {EUROPE, EUROPE_REV1})
+            for (String k : group)
+                if (k.equals(BuildConfig.ROM_SHA1)) return group;
+        return USA;
+    }
+
+    /** "USA" or "Europe": the release this APK plays. */
+    private static String release() { return KNOWN == USA ? "USA: clean, D-pad patch, or D-pad + QoL patch v0.9c"
+            : KNOWN == EUROPE ? "Europe, Revision 0" : "Europe, Revision 1"; }
     private static final int SAVE_SIZE = 1024 * 1024;  // the cartridge's 8 Mbit flash
 
 
@@ -89,8 +112,8 @@ public final class LauncherActivity extends Activity {
     // ---- per game ----
     private static final String TITLE = "The Legend of Zelda\nSpirit Tracks";
     private static final String SUBTITLE = "Nintendo DS · native Android port";
-    private static final String ROM_HELP = "Choose your Spirit Tracks (USA) ROM: the clean dump, or the D-pad or D-pad + QoL "
-            + "patch made from it (the PC scripts copy one in for you). Nothing is downloaded. A save from melonDS (.sav) "
+    private static final String ROM_HELP = "Choose your Spirit Tracks ROM (" + release() + "), the release this app "
+            + "was built for (the PC scripts copy it in for you). Nothing is downloaded. A save from melonDS (.sav) "
             + "can be imported afterwards under Save file.";
     private static final String SAVE_NAME = "SpiritTracks.sav";
     private static final boolean GPU_DEFAULT = true;   // GameActivity: prefs.getBoolean("gpu", ...)
@@ -290,7 +313,7 @@ public final class LauncherActivity extends Activity {
         }
         //noinspection ResultOfMethodCallIgnored
         tmp.delete();
-        return "That file is not a supported Spirit Tracks dump (USA: clean, D-pad patch, or D-pad + QoL patch v0.9c)."
+        return "That file is not a Spirit Tracks dump this app was built for (" + release() + ")."
                 + "\nThis file's SHA-1: " + sha1;
     }
 

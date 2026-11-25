@@ -177,6 +177,14 @@ ffcc_patch(gpu2d_gl_src GPU2D_OpenGL.cpp "                }\n            }\n    
 # where it was found (nds-recomp-manager tools/phone-survey, 2026-10-29). Other GPUs draw as before.
 ffcc_patch(gpu2d_gl_src GPU2D_OpenGL.cpp "    glBindBuffer(GL_ARRAY_BUFFER, Parent.RectVtxBuffer);\n    glBindVertexArray(Parent.RectVtxArray);\n    glDrawArrays(GL_TRIANGLES, 0, 2*3);\n\n    glDisable(GL_SCISSOR_TEST);\n}"
   "    // ph patch: Adreno 5xx drivers crash on this draw unless the queued work is sent first (third_party/CMakeLists.txt)\n    static const bool ph_adreno5 = [] { const char* r = (const char*)glGetString(GL_RENDERER); return r && std::string(r).find(\"Adreno (TM) 5\") != std::string::npos; }();\n    if (ph_adreno5) glFlush();\n    glBindBuffer(GL_ARRAY_BUFFER, Parent.RectVtxBuffer);\n    glBindVertexArray(Parent.RectVtxArray);\n    glDrawArrays(GL_TRIANGLES, 0, 2*3);\n\n    glDisable(GL_SCISSOR_TEST);\n}")
+# Widescreen, the game's letterbox: a cutscene (Spirit Tracks) shows its 3D through window 0, a rectangle almost as wide
+# as the DS's screen (7..249) with bars above and below. Its x range is in DS pixels, so the wide picture's sides fell
+# outside it and stayed black: the scene looked 4:3. A window spanning nearly the whole width now spans the wide picture
+# too (the compositor's x runs from -extra to 256 + extra); narrower windows (a spotlight) keep their place.
+ffcc_patch(gpu2d_gl_src GPU2D_OpenGL.cpp "        if (x0 <= x1)\n        {\n            cfg.WinPos[0] = x0;\n            cfg.WinPos[1] = x1;\n"
+  "        if (x0 <= x1)\n        {\n            cfg.WinPos[0] = x0;\n            cfg.WinPos[1] = x1;\n            if (FfccWideExtra && x0 <= 16 && x1 >= 240) { cfg.WinPos[0] = -FfccWideExtra; cfg.WinPos[1] = 256 + FfccWideExtra; } // st patch: a letterbox spans the wide picture\n")
+ffcc_patch(gpu2d_gl_src GPU2D_OpenGL.cpp "        if (x0 <= x1)\n        {\n            cfg.WinPos[2] = x0;\n            cfg.WinPos[3] = x1;\n"
+  "        if (x0 <= x1)\n        {\n            cfg.WinPos[2] = x0;\n            cfg.WinPos[3] = x1;\n            if (FfccWideExtra && x0 <= 16 && x1 >= 240) { cfg.WinPos[2] = -FfccWideExtra; cfg.WinPos[3] = 256 + FfccWideExtra; } // st patch\n")
 ffcc_write_patched(gpu2d_gl_src ${CMAKE_CURRENT_BINARY_DIR}/melonds_patched/GPU2D_OpenGL.cpp)
 
 # NDSCart.cpp: fast cartridge transfers. The game reads the card with the CPU waiting on every word, at the card's

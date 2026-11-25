@@ -3,9 +3,9 @@
 #   2-BUILD.ps1           recompile the ROM and build the game
 #   3-MAKE-GAME-FOLDER.ps1  SpiritTracks\ with PLAY.cmd: the game, ready to play
 #   4-TEST.ps1            plays it for 40 s by itself, screenshots in logs\
-#   powershell -NoProfile -ExecutionPolicy Bypass -File RUN-ALL.ps1 [-DryRun] [-NoTest] [-Variant qol|dpad|clean]
+#   powershell -NoProfile -ExecutionPolicy Bypass -File RUN-ALL.ps1 [-DryRun] [-NoTest] [-Variant qol|dpad|clean|eur]
 [CmdletBinding()]
-param([switch] $DryRun, [switch] $NoTest, [ValidateSet('', 'qol', 'dpad', 'clean')] [string] $Variant = '')
+param([switch] $DryRun, [switch] $NoTest, [ValidateSet('', 'qol', 'dpad', 'clean', 'eur')] [string] $Variant = '')
 . (Join-Path $PSScriptRoot 'st-common.ps1')
 
 $steps = @('1-INSTALL-TOOLS.ps1', '2-BUILD.ps1', '3-MAKE-GAME-FOLDER.ps1')

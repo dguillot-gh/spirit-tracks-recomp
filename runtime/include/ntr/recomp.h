@@ -47,9 +47,11 @@ typedef struct NtrFuncEntry {
 } NtrFuncEntry;
 
 /* One entry per ARM9 overlay or code region. It is resident when every probe word matches guest memory. */
+/* Up to NTR_MAX_PROBES words that identify the resident overlay (recompiler/src/emit.cpp). */
+#define NTR_MAX_PROBES 8
 typedef struct NtrOverlayInfo {
     uint32_t id, base, size, flags, nprobes;
-    uint32_t probe_addr[4], probe_val[4];
+    uint32_t probe_addr[NTR_MAX_PROBES], probe_val[NTR_MAX_PROBES];
 } NtrOverlayInfo;
 
 /* Not recompiled: while resident, the runtime runs code at these addresses on its interpreter. */
@@ -66,7 +68,7 @@ typedef struct NtrOverlayInfo {
  * links against nothing. Its one exported function, ntr_game_load, is given the runtime's services and the game's
  * hooks by the host, and returns the tables of recompiled functions. Bump NTR_ABI_VERSION whenever this interface or
  * the generated code's meaning changes: a module built for another version is refused (and rebuilt by setup). */
-#define NTR_ABI_VERSION 2u
+#define NTR_ABI_VERSION 3u
 
 #define NTR_RUNTIME_SERVICES(X) \
     X(uint32_t, read32_slow, (NtrCpu* c, uint32_t addr)) \

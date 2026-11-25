@@ -3,9 +3,9 @@
 #   tools folder (st-common.ps1: ST_TOOLS_CACHE, else ..\recomp-backups\tools-cache, else tools-cache in the workspace).
 # A Java 17 or an Android SDK with that NDK already on the PC (Android Studio's, JAVA_HOME, ANDROID_HOME) is used as it
 # is. The first time downloads about 1.5 GB. Android's SDK licence is shown and you accept it yourself (answer y).
-#   powershell -NoProfile -ExecutionPolicy Bypass -File ANDROID-TOOLS.ps1 [-DryRun] [-Variant qol|dpad|clean]
+#   powershell -NoProfile -ExecutionPolicy Bypass -File ANDROID-TOOLS.ps1 [-DryRun] [-Variant qol|dpad|clean|eur]
 [CmdletBinding()]
-param([switch] $DryRun, [ValidateSet('', 'qol', 'dpad', 'clean')] [string] $Variant = '')
+param([switch] $DryRun, [ValidateSet('', 'qol', 'dpad', 'clean', 'eur')] [string] $Variant = '')
 . (Join-Path $PSScriptRoot 'st-common.ps1')
 
 Refresh-Path

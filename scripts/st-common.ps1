@@ -28,8 +28,10 @@ $Variants = @{
     'dpad'  = @{ Label = 'USA, D-pad patch v0.9c'; Preset = 'release-dpad'; Game = 'SpiritTracks-DPad'
                  Patch = 'dpadonly\loz_st_dpad_0.9c-ua.bps'; Size = 94096060; Crc = 'a966458d' }
     'clean' = @{ Label = 'USA, clean'; Preset = 'release-clean'; Game = 'SpiritTracks-Clean'; Patch = ''; Size = 134217728; Crc = '38392357' }
+    # Europe (En,Fr,De,Es,It): your dump as it is (no D-pad patch exists for it), Revision 0 or Revision 1.
+    'eur'   = @{ Label = 'Europe'; Preset = 'release-eur'; Game = 'SpiritTracks-Europe'; Patch = ''; Size = 0; Crc = '' }
 }
-if (-not $Variants.ContainsKey($Variant)) { Write-Host "unknown variant '$Variant' (qol, dpad or clean)" -ForegroundColor Red; exit 1 }
+if (-not $Variants.ContainsKey($Variant)) { Write-Host "unknown variant '$Variant' (qol, dpad, clean or eur)" -ForegroundColor Red; exit 1 }
 $V = $Variants[$Variant]
 $CleanSha1 = '1f0921b5e99db9d92d24710f1b004e4f3c997b73'   # Legend of Zelda, The - Spirit Tracks (USA, Australia) (En,Fr,Es).nds
 # Every ROM a build plays (common/src/known_roms.cpp): the three share one recompiled game, so the app takes any of them.
@@ -37,6 +39,12 @@ $PlayableSha1 = @($CleanSha1, '6a63d88702c34da626e273dfca4931d52ac4551b', '6896c
 # USA Rev 1 is the same size but different code: zeldaret/st and the D-pad patches only cover Rev 0, so it is refused.
 $Rev1Sha1 = '9953bce6ce32c35d084300c32b555b40aa013047'    # Legend of Zelda, The - Spirit Tracks (USA) (En,Fr,Es) (Rev 1).nds
 $CleanSize = 134217728
+# Europe (BKIP): Revision 0 and Revision 1 (the dumps zeldaret/st lists); the two revisions differ in code, so a build
+# plays the revision it was made from (frontend/config/bkip or bkip1, picked by CMake from the ROM's header).
+$EurSha1 = @('9e99cc803a14ce038eb908db585431f8254f09ee')
+$EurRev1Sha1 = @('dcb221a89acb894503a461c2c7d4cfdad9a06b68', 'b9096f46e9163750a9e3f6c2fc0758e6094b6135',
+                 'b0288a880498c12508e53f4373085eb88955e14b', '4efbff9a263fe622f3f7e7cfb7bea8046b86e57d',
+                 '52d7f22255d5d86fc40d3a43c7de969e0365ff7d')
 # Where the patches are looked for: the patch's own folder as it unzips, or the workspace itself.
 $PatchDirs = @((Join-Path $RomsDir 'patches\loz_st_dpad_qol-v0.9c'), (Join-Path $RomsDir 'loz_st_dpad_qol-v0.9c'),
                (Join-Path $Root 'loz_st_dpad_qol-v0.9c'), $RomsDir, $Root)
@@ -142,7 +150,26 @@ function Find-PatchedRom {
 # The ROM of the chosen variant: the clean dump itself; for a patched variant, a ROM you already patched the same way,
 # else the patched copy made from the clean dump in st-roms\ (made once by tools\bps_patch.py, which checks the patch's
 # CRC-32s; the clean dump is only read). Returns its path.
+# A European dump (Revision 0 or 1) in the workspace, by SHA-1; sets $PlayableSha1 to its revision's dumps.
+function Find-EuropeRom {
+    $candidates = @(Get-ChildItem -Path $Root, $RomsDir -Filter '*.nds' -File -ErrorAction SilentlyContinue)
+    foreach ($c in $candidates) {
+        $h = (Get-FileHash -Algorithm SHA1 -LiteralPath $c.FullName).Hash.ToLower()
+        if ($EurSha1 -contains $h) { $script:PlayableSha1 = $EurSha1; $script:V.Label = 'Europe, Rev 0'; return $c.FullName }
+        if ($EurRev1Sha1 -contains $h) { $script:PlayableSha1 = $EurRev1Sha1; $script:V.Label = 'Europe, Rev 1'; return $c.FullName }
+    }
+    return $null
+}
 function Find-Rom {
+    if ($Variant -eq 'eur') {
+        $eur = Find-EuropeRom
+        if (-not $eur) {
+            $msg = "no Spirit Tracks (Europe) dump in $Root or $RomsDir (SHA-1 $($EurSha1[0]) for Revision 0, or one of $($EurRev1Sha1 -join ', ') for Revision 1): copy yours there, any file name"
+            if ($DryRun) { Warn $msg; return (Join-Path $Root 'your-spirit-tracks-europe.nds') } else { Fail $msg }
+        }
+        Step "game: Spirit Tracks ($($V.Label)): $eur"
+        return $eur
+    }
     if ($Variant -ne 'clean') {
         $ready = Find-PatchedRom
         if ($ready) { Step "game: Spirit Tracks ($($V.Label)), already patched: $ready"; return $ready }

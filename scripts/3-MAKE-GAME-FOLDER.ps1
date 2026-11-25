@@ -8,9 +8,9 @@
 #     data\saves\bkie.sav               your melonDS save, copied ONCE (an existing save here is never overwritten)
 #     README.md, LICENSE, NOTICE.md     the controls; GPL-3.0 and where the code comes from
 # Running it again updates the program and the game; saves and settings in data\ are kept.
-#   powershell -NoProfile -ExecutionPolicy Bypass -File 3-MAKE-GAME-FOLDER.ps1 [-DryRun] [-Variant qol|dpad|clean]
+#   powershell -NoProfile -ExecutionPolicy Bypass -File 3-MAKE-GAME-FOLDER.ps1 [-DryRun] [-Variant qol|dpad|clean|eur]
 [CmdletBinding()]
-param([switch] $DryRun, [ValidateSet('', 'qol', 'dpad', 'clean')] [string] $Variant = '')
+param([switch] $DryRun, [ValidateSet('', 'qol', 'dpad', 'clean', 'eur')] [string] $Variant = '')
 . (Join-Path $PSScriptRoot 'st-common.ps1')
 
 $rom = Find-Rom

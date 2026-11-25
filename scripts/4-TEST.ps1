@@ -3,9 +3,9 @@
 # Runs the variant's game folder (SpiritTracks\ by default) on a scratch COPY of the save and a scratch settings folder:
 # the save in its data\ and your melonDS save are never touched. Results: logs\spirit-tracks\test-<variant>-<time>\
 # (PNG screenshots, stderr.log). A window opens while it runs. To check the clean game too: -Variant clean.
-#   powershell -NoProfile -ExecutionPolicy Bypass -File 4-TEST.ps1 [-DryRun] [-Variant qol|dpad|clean]
+#   powershell -NoProfile -ExecutionPolicy Bypass -File 4-TEST.ps1 [-DryRun] [-Variant qol|dpad|clean|eur]
 [CmdletBinding()]
-param([switch] $DryRun, [ValidateSet('', 'qol', 'dpad', 'clean')] [string] $Variant = '')
+param([switch] $DryRun, [ValidateSet('', 'qol', 'dpad', 'clean', 'eur')] [string] $Variant = '')
 . (Join-Path $PSScriptRoot 'st-common.ps1')
 
 $exe = Join-Path $GameDir 'SpiritTracks.exe'

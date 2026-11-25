@@ -6,16 +6,17 @@
 #include <cstring>
 
 #include "ntr/runtime.hpp"
+#include "st_hooks.hpp"
 
 namespace st {
 namespace {
 
 std::atomic<int> g_x{0}, g_y{0};  // the stick, -1000..1000 (y down)
 
-// BKIE (USA), the D-pad patch v0.9c (its routines at 0x02044B00..0x02044D78, read from the patched ARM9):
-constexpr uint32_t kInputPtr = 0x0204AEDC;   // 0x0204A0F0 + 3564: the game's input; held buttons at +288
+// BKIE (USA), the D-pad patch v0.9c (its routines at 0x02044B00..0x02044D78, read from the patched ARM9). The game's
+// input pointer (0x0204A0F0 + 3564; held buttons at +288) and the camera's yaw function (r0 = the camera, r8 here) are
+// per release: st_hooks.cpp, addresses().
 constexpr uint32_t kHeldOffset = 288;
-constexpr uint32_t kCameraYaw = 0x02078678;  // UnkStruct_027e09bc_0C::func_ov000_02078698 (r0 = the camera, r8 here)
 // UnkStruct_027e0ce0_40_Base_14 (r4 here; zeldaret/st include/Unknown/UnkStruct_027e0ce0.hpp):
 constexpr uint32_t kDist = 0x3C;      // mUnk_3C: the stylus's distance from Link, fx32 pixels
 constexpr uint32_t kUnk40 = 0x40;     // mUnk_40, mUnk_5C: cleared, as the patch does
@@ -57,7 +58,7 @@ extern "C" int st_stick_move(NtrCpu* c) {
     const float y = float(st::g_y.load(std::memory_order_relaxed)) / 1000.0f;
     const float mag = std::min(1.0f, std::hypot(x, y));
     if (mag < st::kDeadZone) return 0;
-    const uint32_t input = ntr_rd32(c, st::kInputPtr);
+    const uint32_t input = ntr_rd32(c, st::addresses().input_ptr);
     const uint32_t held = (input >= 0x02000000u && input < 0x02400000u) ? ntr_rd32(c, input + st::kHeldOffset) : 0;
     if (held & st::kSelect) return 0;
 
@@ -65,7 +66,7 @@ extern "C" int st_stick_move(NtrCpu* c) {
     uint32_t saved[16];
     std::memcpy(saved, c->r, sizeof saved);
     c->r[0] = c->r[8];
-    ntr_call(c, st::kCameraYaw);
+    ntr_call(c, st::addresses().camera_yaw);
     const uint32_t yaw = c->r[0];
     std::memcpy(c->r, saved, sizeof saved);
 

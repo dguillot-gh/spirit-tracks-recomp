@@ -39,6 +39,21 @@ static const KnownRom kKnownRoms[] = {
      "The Legend of Zelda - Spirit Tracks (USA) (D-pad patch v0.9c)", true},
     {"6896c1db2b3a725cb991f711a875fc2228b7620e", "44c7c45b", 94097260, "BKIE", "USA (D-pad + QoL patch)",
      "The Legend of Zelda - Spirit Tracks (USA) (D-pad + QoL patch v0.9c)", true},
+    // Europe (BKIP, En,Fr,De,Es,It), Revision 0 and Revision 1: their overlays differ, so each has its own config
+    // (frontend/config/bkip, bkip1, from the zeldaret/st decomp's config/eur and config/eur1) and its own build. The
+    // SHA-1s are the decomp's (st_eur.sha1, st_eur1.sha1: Revision 1 has several dumps). No D-pad patch for Europe.
+    {"9e99cc803a14ce038eb908db585431f8254f09ee", "", 0, "BKIP", "Europe",
+     "The Legend of Zelda - Spirit Tracks (Europe) (En,Fr,De,Es,It)", true, 0},
+    {"dcb221a89acb894503a461c2c7d4cfdad9a06b68", "", 0, "BKIP", "Europe (Rev 1)",
+     "The Legend of Zelda - Spirit Tracks (Europe) (En,Fr,De,Es,It) (Rev 1)", true, 1},
+    {"b9096f46e9163750a9e3f6c2fc0758e6094b6135", "", 0, "BKIP", "Europe (Rev 1)",
+     "The Legend of Zelda - Spirit Tracks (Europe) (En,Fr,De,Es,It) (Rev 1)", true, 1},
+    {"b0288a880498c12508e53f4373085eb88955e14b", "", 0, "BKIP", "Europe (Rev 1)",
+     "The Legend of Zelda - Spirit Tracks (Europe) (En,Fr,De,Es,It) (Rev 1)", true, 1},
+    {"4efbff9a263fe622f3f7e7cfb7bea8046b86e57d", "", 0, "BKIP", "Europe (Rev 1)",
+     "The Legend of Zelda - Spirit Tracks (Europe) (En,Fr,De,Es,It) (Rev 1)", true, 1},
+    {"52d7f22255d5d86fc40d3a43c7de969e0365ff7d", "", 0, "BKIP", "Europe (Rev 1)",
+     "The Legend of Zelda - Spirit Tracks (Europe) (En,Fr,De,Es,It) (Rev 1)", true, 1},
 };
 
 std::span<const KnownRom> known_roms() { return kKnownRoms; }

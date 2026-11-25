@@ -3,9 +3,9 @@
 # game (st_game.dll) and the program (SpiritTracks.exe) are compiled. The first build also downloads SDL3.
 # -Variant picks the game (st-common.ps1): qol (default, build\release), dpad (build\release-dpad) or clean
 # (build\release-clean). Each is its own build: a patched ROM's code is not the clean one's.
-#   powershell -NoProfile -ExecutionPolicy Bypass -File 2-BUILD.ps1 [-Clean] [-Jobs N] [-DryRun] [-Variant qol|dpad|clean]
+#   powershell -NoProfile -ExecutionPolicy Bypass -File 2-BUILD.ps1 [-Clean] [-Jobs N] [-DryRun] [-Variant qol|dpad|clean|eur]
 [CmdletBinding()]
-param([switch] $Clean, [int] $Jobs = 0, [switch] $DryRun, [ValidateSet('', 'qol', 'dpad', 'clean')] [string] $Variant = '')
+param([switch] $Clean, [int] $Jobs = 0, [switch] $DryRun, [ValidateSet('', 'qol', 'dpad', 'clean', 'eur')] [string] $Variant = '')
 . (Join-Path $PSScriptRoot 'st-common.ps1')
 
 $rom = Find-Rom
@@ -13,6 +13,8 @@ $rom = Find-Rom
 # The source tree: everything the configure step reads.
 $need = @('CMakeLists.txt', 'CMakePresets.json', 'third_party\CMakeLists.txt', 'frontend\CMakeLists.txt',
           'frontend\config\bkie\functions.txt', 'frontend\config\bkie\hooks.txt', 'frontend\config\bkie\regions.txt',
+          'frontend\config\bkip\functions.txt', 'frontend\config\bkip\hooks.txt', 'frontend\config\bkip1\functions.txt',
+          'frontend\config\bkip1\hooks.txt',
           'frontend\src\main.cpp', 'frontend\src\st_hooks.cpp', 'frontend\res\app.ico', 'runtime\include\ntr\recomp.h',
           'recompiler\src\main.cpp')
 foreach ($n in $need) { if (-not (Test-Path (Join-Path $Repo $n))) { Fail "missing $Repo\$n" } }
