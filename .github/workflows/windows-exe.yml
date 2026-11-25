@@ -1,6 +1,6 @@
 # Builds SpiritTracks.exe the way a player downloads it: the program only (recompiler + TinyCC + its build files
 # inside), no ROM and no game. On first run it asks for the player's own ROM and builds the game itself.
-name: Windows exe
+name: Windows exe + Android shell APK
 on:
   push:
     branches: [feature/pc-setup]
@@ -38,3 +38,30 @@ jobs:
         with:
           name: SpiritTracks-windows
           path: out/SpiritTracks
+  android:
+    # The shell APK: the program only (recompiler + TinyCC inside); the player imports their ROM and it builds on the phone.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - name: NDK + CMake
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;28.2.13676358" "cmake;3.31.6" > /dev/null
+      - name: SDL source
+        run: git clone --depth 1 -b release-3.4.18 https://github.com/libsdl-org/SDL.git "$RUNNER_TEMP/sdl3-src"
+      - name: Build shell APK
+        run: |
+          chmod +x android/gradlew
+          android/gradlew --no-daemon -p android :app:assembleDebug -PstShell -PstCmakeVersion=3.31.6 \
+            "-PstSdlSource=$RUNNER_TEMP/sdl3-src"
+          unzip -l android/app/build/outputs/apk/debug/app-debug.apk | grep -E "\.so$"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SpiritTracks-android-shell
+          path: android/app/build/outputs/apk/debug/app-debug.apk
