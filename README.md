@@ -57,6 +57,26 @@ program and Android app, set up for Spirit Tracks.
 - Movable on-screen controls, portrait mode with both screens like a DS held open
 - 120 Hz (or 60 Hz) display mode and Android's performance hint, for a steady 60 fps
 
+### PC and phone: what differs
+
+The two builds share the game, the renderers and the menu, but each has a few things of its own. Most new features
+are tried on a phone first, so the PC column can lag behind; this table is kept up to date with each release.
+
+| Feature | PC (Windows) | Phone (Android) |
+|---|---|---|
+| Renderers | Software, OpenGL, Compute, 2x-8x | Software, OpenGL, Compute, up to 4x |
+| Widescreen (16:10, 16:9, 21:9) | Yes (OpenGL / Compute) | Yes (OpenGL / Compute) |
+| Two-screen 3D shown joined (Tower of Spirits) | Should work (same code); not tried on a PC yet | Yes |
+| HD text, save states, Continue, language | Yes | Yes |
+| D-pad controls and the analog stick | Keyboard arrows, a gamepad's D-pad or left stick | On-screen pad and stick, or a gamepad |
+| Stylus | Mouse | Touch |
+| Screens | One screen (Tab / F2 swaps), or both side by side (menu: Screen) | One screen, the other as a **minimap** in the corner; both in portrait |
+| Minimap | No (yet) | Yes: tap to swap, hold to move, pinch to resize, MAP hides it |
+| Microphone / blow, lid | Hold M / C | MIC, BLOW and LID buttons |
+| Movable on-screen controls | No (not needed) | Yes ("Move and resize controls") |
+| Fullscreen, screenshot, fast-forward | F11, F12, hold \` | No (always fullscreen) |
+| 120 Hz mode, Android performance hint | No (follows the monitor) | Yes |
+
 Tested devices, measurements and known issues: [TESTING.md](TESTING.md).
 
 Ideas and features being considered next: [docs/WISHLIST.md](docs/WISHLIST.md).
