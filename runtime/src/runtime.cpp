@@ -23,6 +23,7 @@
 
 namespace melonDS {
 extern int FfccComputeOutputWidth;
+extern int FfccDrawnScreenSwap;
 }
 
 namespace ntr {
@@ -360,7 +361,9 @@ void RuntimeImpl::end_frame() {
         frame.gl_texture = *static_cast<const GLuint*>(top);
         frame.scale = video_.scale;
         frame.wide_extra = video_.wide_extra;
-        frame.wide_layer = n.GPU.ScreenSwap ? 0 : 1;  // (POWCNT1 bit 15: engine A on the top screen)
+        // (POWCNT1 bit 15: engine A on the top screen; as the frame was drawn, third_party/CMakeLists.txt)
+        const bool drawn_swap = melonDS::FfccDrawnScreenSwap >= 0 ? melonDS::FfccDrawnScreenSwap != 0 : n.GPU.ScreenSwap;
+        frame.wide_layer = drawn_swap ? 0 : 1;
         frame.hud_absent = melonDS::FfccHudSeen;
         if (melonDS::FfccHudEdges) {
             frame.hud_moves = std::clamp(melonDS::FfccHudMovedCount, 0, 32);

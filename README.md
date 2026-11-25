@@ -17,6 +17,10 @@ program and Android app, set up for Spirit Tracks.
 
 *Cutscenes in widescreen too: the scene fills the whole 21:9 width, with the game's own letterbox bars above and below.*
 
+![A Tower of Spirits room on an Android phone: the DS's top and bottom screens shown joined as one tall widescreen picture](docs/images/phone-two-screen-joined.jpg)
+
+*Rooms drawn across both screens (the Tower of Spirits) are shown joined, top above bottom, as one seamless picture.*
+
 ## Features
 
 **Picture**
@@ -25,6 +29,8 @@ program and Android app, set up for Spirit Tracks.
   wide picture (no pop-in at the sides), cutscenes fill it too (the game's letterbox spans the width), and the HUD
   (hearts, timer, Menu button, the train's lever and horn cord) sits at the picture's edges and still answers touches
   there
+- Two-screen 3D (the Tower of Spirits' rooms, where the game draws one tall view across both screens a frame at a
+  time): both screens are shown joined, wide and without the gap between them, and back to the usual layout after
 - HD text: dialogue, choices and labels drawn with a vector font at the screen's own resolution, kept with save states
   (from Phantom Hourglass Recomp, by chouette-cc)
 - Sharp or smooth filtering; the DS's shape or stretched

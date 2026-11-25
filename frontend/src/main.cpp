@@ -92,6 +92,8 @@ std::atomic<bool> map_hidden{false};
 std::atomic<int> map_dy{0};
 }  // namespace st::pad
 
+extern "C" int ffcc_join_screens;  // (melonDS, third_party/CMakeLists.txt: two-screen 3D shown joined)
+
 namespace {
 
 constexpr char kTitle[] = "The Legend of Zelda: Spirit Tracks";
@@ -721,12 +723,29 @@ private:
         if (frames_ > video_asked_ + 2)
             s_.compute_failed = view.gpu && view.compute && rt_->video().renderer == ntr::Renderer::OpenGL;
 
+        // Two-screen 3D: some scenes (Zelda in the Tower of Spirits) draw their 3D on both screens, the top one frame
+        // and the bottom the next, engine A moving between them (POWCNT1); each screen meanwhile shows engine B's copy
+        // of its last picture (display capture), which is 256 pixels wide. In widescreen each screen then went from
+        // the wide picture to a 4:3 one with black sides every frame, and the layout with it: a shaking, narrow scene.
+        // While engine A changes screens every frame, each screen shows engine A's own (wide) picture from the frame
+        // it was last there, kept by the presenter, and both screens are wide.
+        const int extra = view.wide ? frame.wide_extra : 0;  // (0 until the renderer has made the change)
+        const bool moved = last_wide_layer_ >= 0 && frame.wide_layer != last_wide_layer_;
+        last_wide_layer_ = frame.wide_layer;
+        dual_run_ = moved ? std::min(dual_run_ + 1, 1000) : 0;
+        dual_still_ = moved ? 0 : std::min(dual_still_ + 1, 1000);
+        dual_3d_ = extra > 0 && frame.gl_texture && (dual_run_ >= 4 || (dual_3d_ && dual_still_ < 3));
+        st::set_dual_screen_3d(dual_3d_);
+        ffcc_join_screens = dual_3d_ ? 1 : 0;  // (closes the gap the game leaves between the two halves: third_party)
+        if (extra > 0 && frame.gl_texture && (moved || dual_3d_)) gl_->hold_wide(frame);
+        const auto layer_wide = [&](int layer) { return extra > 0 && (dual_3d_ || layer == frame.wide_layer); };
+        const auto layer_held = [&](int layer) { return dual_3d_ && layer != frame.wide_layer; };
+
         int w = 0, h = 0;
         SDL_GetWindowSizeInPixels(window_, &w, &h);
         gl_->begin(w, h);
-        const int extra = view.wide ? frame.wide_extra : 0;  // (0 until the renderer has made the change)
         s_.wide_extra = extra;
-        s_.wide_layer = frame.wide_layer;
+        s_.wide_layer = dual_3d_ ? 2 : frame.wide_layer;
         std::array<st::HudMove, 32> frame_hud{};
         int frame_hud_count = 0;
         {
@@ -739,18 +758,19 @@ private:
                 frame_hud[size_t(i)] = s_.hud[size_t(i)];
             }
         }
-        const st::Views v = st::compute_views(float(w), float(h), view.layout, view.stretch, extra, frame.wide_layer);
+        const st::Views v =
+            st::compute_views(float(w), float(h), view.layout, view.stretch, extra, dual_3d_ ? 2 : frame.wide_layer);
         if (v.top_shown) {
-            gl_->screen(frame, 0, v.top, view.smooth, extra > 0);
-            const bool wide_top = extra > 0 && frame.wide_layer == 0;
-            gl_->draw_hd_text(0, v.top, wide_top ? extra : 0, wide_top ? frame_hud.data() : nullptr,
-                              wide_top ? frame_hud_count : 0);
+            gl_->screen(frame, 0, v.top, view.smooth, extra > 0, layer_held(0));
+            const bool hud_top = extra > 0 && frame.wide_layer == 0;
+            gl_->draw_hd_text(0, v.top, layer_wide(0) ? extra : 0, hud_top ? frame_hud.data() : nullptr,
+                              hud_top ? frame_hud_count : 0);
         }
         if (v.bottom_shown) {
-            gl_->screen(frame, 1, v.bottom, view.smooth, extra > 0);
-            const bool wide_bot = extra > 0 && frame.wide_layer == 1;
-            gl_->draw_hd_text(1, v.bottom, wide_bot ? extra : 0, wide_bot ? frame_hud.data() : nullptr,
-                              wide_bot ? frame_hud_count : 0);
+            gl_->screen(frame, 1, v.bottom, view.smooth, extra > 0, layer_held(1));
+            const bool hud_bot = extra > 0 && frame.wide_layer == 1;
+            gl_->draw_hd_text(1, v.bottom, layer_wide(1) ? extra : 0, hud_bot ? frame_hud.data() : nullptr,
+                              hud_bot ? frame_hud_count : 0);
         }
         // The minimap: the screen not shown, small, where the phone's pad put it (st::pad::map_*), like a game's
         // corner map. The same picture as that screen would show, kept to its own shape inside the rectangle.
@@ -764,10 +784,10 @@ private:
                             (s_.held.load() & (ntr::KeyUp | ntr::KeyDown | ntr::KeyLeft | ntr::KeyRight)) != 0;
         map_input_quiet_ = moving ? 0 : std::min(map_input_quiet_ + 1, 1000);
         const bool map_off = frame.hud_absent >= 30 && map_input_quiet_ >= 60;
-        st::pad::map_hidden.store(map_off);
+        st::pad::map_hidden.store(map_off || dual_3d_);  // (two-screen 3D: both screens are shown, joined)
         if (v.top_shown != v.bottom_shown && st::pad::map_w.load() > 0 && st::pad::map_h.load() > 0 && !map_off) {
             const int layer = v.top_shown ? 1 : 0;
-            const int layer_extra = layer == frame.wide_layer ? extra : 0;
+            const int layer_extra = layer_wide(layer) ? extra : 0;
             const float aspect = (256.0f + 2.0f * float(layer_extra)) / 192.0f;
             const float bx = float(st::pad::map_x.load()), by = float(st::pad::map_y.load());
             const float bw = float(st::pad::map_w.load()), bh = float(st::pad::map_h.load());
@@ -778,7 +798,7 @@ private:
             {
                 const st::Rect& main_r = v.top_shown ? v.top : v.bottom;
                 const int main_layer = v.top_shown ? 0 : 1;
-                const int main_extra = main_layer == frame.wide_layer ? extra : 0;
+                const int main_extra = layer_wide(main_layer) ? extra : 0;
                 const float mx = main_r.w / (256.0f + 2.0f * float(main_extra)), my = main_r.h / 192.0f;
                 std::vector<st::TextBox> boxes;
                 st::text_boxes(main_layer, boxes);
@@ -792,8 +812,9 @@ private:
                 r.y += dy;
                 st::pad::map_dy.store(int(std::lround(dy)));
             }
-            gl_->screen(frame, layer, r, view.smooth, extra > 0);
-            gl_->draw_hd_text(layer, r, layer_extra, layer_extra ? frame_hud.data() : nullptr, layer_extra ? frame_hud_count : 0);
+            gl_->screen(frame, layer, r, view.smooth, extra > 0, layer_held(layer));
+            const bool hud = layer_extra && layer == frame.wide_layer;
+            gl_->draw_hd_text(layer, r, layer_extra, hud ? frame_hud.data() : nullptr, hud ? frame_hud_count : 0);
         }
         // Frames per second: the game's frames shown, counted over a second.
         if (count_game_frame) fps_frames_++;
@@ -916,6 +937,10 @@ private:
     st::GlPresenter* gl_ = nullptr;  // (null: the phone's fallback, the main thread draws)
     int map_input_quiet_ = 1000;  // frames since the player last moved Link (the minimap's cutscene check)
     int map_touch_frames_ = 0;    // frames the touch screen has been held (the same check)
+    int last_wide_layer_ = -1;    // two-screen 3D: the screen engine A was on last frame,
+    int dual_run_ = 0;            // frames in a row it changed screens,
+    int dual_still_ = 0;          // frames since it last did,
+    bool dual_3d_ = false;        // and whether the game is drawing its 3D on both screens
 #ifndef __ANDROID__
     int thumbs_version_ = -1;  // the slot pictures in gl_ (states_version)
     std::array<std::string, kSlots> times_{};
@@ -1523,12 +1548,12 @@ int main(int argc, char** argv) {
             int tx = 0, ty = 0;
             std::array<st::HudMove, 32> hud{};
             int hud_count = 0;
-            if (wide_layer == 1 && wide_extra) {
+            if (wide_layer == 1 && wide_extra) {  // (the HUD moves are engine A's: not in two-screen 3D, 2)
                 std::lock_guard<std::mutex> lock(shared.hud_mutex);
                 hud = shared.hud;
                 hud_count = shared.hud_count;
             }
-            st::to_ds(views.bottom, wide_layer == 1 ? wide_extra : 0, mx, my, tx, ty, hud.data(), hud_count);
+            st::to_ds(views.bottom, wide_layer != 0 ? wide_extra : 0, mx, my, tx, ty, hud.data(), hud_count);
             shared.touch_x = tx;
             shared.touch_y = ty;
         }

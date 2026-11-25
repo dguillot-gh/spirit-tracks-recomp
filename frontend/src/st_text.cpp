@@ -67,6 +67,7 @@ std::vector<HdGlyph> g_visible[2];       // indexed by screen layer (0 = top, 1 
 std::vector<DrawnText> g_drawn_pending[2];  // every text object drawn this frame, by 2D engine
 std::vector<TextBox> g_box_pending[2];   // the text boxes drawn this frame, by 2D engine
 std::vector<TextBox> g_box_visible[2];   // ... as shown, by screen layer
+std::atomic<bool> g_dual_3d{false};      // two-screen 3D: engine B's text is not shown (set_dual_screen_3d)
 
 stbtt_fontinfo g_font{};
 std::atomic<int> g_font_state{0};  // 0 uninit, 1 ready, -1 failed
@@ -278,6 +279,8 @@ void text_boxes(int layer, std::vector<TextBox>& out) {
     out = g_box_visible[layer];
 }
 
+void set_dual_screen_3d(bool on) { g_dual_3d.store(on, std::memory_order_relaxed); }
+
 void hd_text_draw_list(int layer, std::vector<HdGlyph>& out) {
     out.clear();
     if (layer < 0 || layer > 1) return;
@@ -471,10 +474,16 @@ extern "C" void st_text_oam_flush(NtrCpu* c) {
 
     std::lock_guard<std::mutex> lock(st::g_mutex);
     auto& pending = st::g_pending[engine];
-    auto& visible = st::g_visible[layer];
+    // Two-screen 3D (set_dual_screen_3d): a screen keeps the text engine A drew on it last frame, as the picture shown
+    // there is engine A's from last frame; engine B's (a copy of that frame) goes nowhere.
+    static std::vector<st::HdGlyph> unshown_glyphs;
+    static std::vector<st::TextBox> unshown_boxes;
+    const bool unshown = engine == 1 && st::g_dual_3d.load(std::memory_order_relaxed);
+    auto& visible = unshown ? unshown_glyphs : st::g_visible[layer];
+    auto& boxes = unshown ? unshown_boxes : st::g_box_visible[layer];
     visible.clear();
-    st::g_box_visible[layer].clear();
-    if (obj_on && !(bright_mode != 0 && bright_factor >= 16)) st::g_box_visible[layer] = st::g_box_pending[engine];
+    boxes.clear();
+    if (obj_on && !(bright_mode != 0 && bright_factor >= 16)) boxes = st::g_box_pending[engine];
     st::g_box_pending[engine].clear();
 
     if (obj_on && !pending.empty() && !(bright_mode != 0 && bright_factor >= 16)) {

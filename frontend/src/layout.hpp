@@ -20,11 +20,14 @@ struct Views {
 };
 
 // `stretch`: fill the whole window instead (the DS's shape is lost; Both splits the window between the two screens).
-// Widescreen: `wide_extra` DS pixels more on each side of the screen in layer `wide_layer` (0 top, 1 bottom).
+// Widescreen: `wide_extra` DS pixels more on each side of the screen in layer `wide_layer` (0 top, 1 bottom, 2 both: the
+// game's 3D on both screens, main.cpp). With both, the two screens are shown joined, top above bottom, whatever the
+// layout: such a scene is one tall view the game splits between them (the Tower of Spirits' rooms).
 inline Views compute_views(float win_w, float win_h, Layout layout, bool stretch = false, int wide_extra = 0,
                            int wide_layer = 1) {
     constexpr float kW = 256, kH = 192;
     Views v;
+    if (wide_layer == 2) layout = Layout::Both;
     if (stretch) {
         v.top_shown = layout != Layout::Bottom;
         v.bottom_shown = layout != Layout::Top;
@@ -37,8 +40,8 @@ inline Views compute_views(float win_w, float win_h, Layout layout, bool stretch
         return v;
     }
     const float content_h = layout == Layout::Both ? kH * 2 : kH;
-    const float top_w = kW + (wide_layer == 0 ? 2.0f * float(wide_extra) : 0.0f);
-    const float bottom_w = kW + (wide_layer == 1 ? 2.0f * float(wide_extra) : 0.0f);
+    const float top_w = kW + (wide_layer != 1 ? 2.0f * float(wide_extra) : 0.0f);
+    const float bottom_w = kW + (wide_layer != 0 ? 2.0f * float(wide_extra) : 0.0f);
     const float content_w = layout == Layout::Both ? std::max(top_w, bottom_w) : layout == Layout::Top ? top_w : bottom_w;
     const float scale = std::max(0.0f, std::min(win_w / content_w, win_h / content_h));
     const float h = kH * scale, tw = top_w * scale, bw = bottom_w * scale;
