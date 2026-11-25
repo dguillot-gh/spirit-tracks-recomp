@@ -15,6 +15,20 @@ if(ST_ROM AND EXISTS "${ST_ROM}")
   message(STATUS "Spirit Tracks config: ${ST_CONFIG_CODE}")
 endif()
 set(ST_CONFIG ${CMAKE_CURRENT_SOURCE_DIR}/config/${ST_CONFIG_CODE})
+# The version and commit the program shows (menu header, window title): "v0.1.0 (abc1234)", "-dirty" with local changes.
+execute_process(COMMAND git rev-parse --short=7 HEAD WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+                OUTPUT_VARIABLE ST_GIT_COMMIT OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
+execute_process(COMMAND git status --porcelain --untracked-files=no WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+                OUTPUT_VARIABLE ST_GIT_DIRTY OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
+if(NOT ST_GIT_COMMIT)
+  set(ST_GIT_COMMIT "unknown")
+elseif(ST_GIT_DIRTY)
+  string(APPEND ST_GIT_COMMIT "-dirty")
+endif()
+set(ST_BUILD_LABEL "v${PROJECT_VERSION} (${ST_GIT_COMMIT})")
+if(EXISTS ${CMAKE_SOURCE_DIR}/.git)
+  set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/.git)
+endif()
 
 # Embedded HD font (Inter Bold, SIL OFL 1.1) for optional vector text rendering.
 set(ST_HD_FONT_SRC ${CMAKE_CURRENT_BINARY_DIR}/hd_font_data.cpp)
@@ -31,16 +45,27 @@ add_custom_command(
 # ---- Android: the game's C comes from a PC build (recomp_generated), compiled here for the phone ----
 if(ANDROID)
   set(ST_GENERATED_DIR "" CACHE PATH "The recomp_generated folder of a PC build (2-BUILD.ps1)")
-  if(NOT EXISTS "${ST_GENERATED_DIR}/func_table.c")
+  if(ST_SHELL)
+    # The shell APK: no game inside. libstbuild = the recompiler + TinyCC (LGPL, kept in its own library), which build
+    # files/game/libst_game.so on the phone from the player's ROM (android_build.cpp).
+    set(TCC_DIR ${CMAKE_SOURCE_DIR}/third_party/tinycc)
+    add_library(stbuild SHARED src/android_build.cpp src/game_builder.cpp ${TCC_DIR}/libtcc.c)
+    set_source_files_properties(${TCC_DIR}/libtcc.c PROPERTIES COMPILE_OPTIONS "-w" COMPILE_DEFINITIONS "ONE_SOURCE=1")
+    target_include_directories(stbuild PRIVATE ${TCC_DIR}/config/android ${TCC_DIR})
+    target_compile_options(stbuild PRIVATE -O2)
+    target_link_libraries(stbuild PRIVATE ntr_recomp ntr_common log)
+  elseif(NOT EXISTS "${ST_GENERATED_DIR}/func_table.c")
     message(FATAL_ERROR "ST_GENERATED_DIR must be a PC build's recomp_generated folder (run 2-BUILD.ps1 first)")
   endif()
   file(GLOB ST_GEN_SHARDS CONFIGURE_DEPENDS "${ST_GENERATED_DIR}/funcs_*.c")
+  if(NOT ST_SHELL)
   add_library(st_game SHARED ${ST_GENERATED_DIR}/func_table.c ${ST_GEN_SHARDS})
   target_include_directories(st_game PRIVATE ${ST_GENERATED_DIR} ${CMAKE_SOURCE_DIR}/runtime/include)
   target_compile_definitions(st_game PRIVATE NTR_GAME_MODULE=1)
   set_target_properties(st_game PROPERTIES C_VISIBILITY_PRESET hidden)
   target_compile_options(st_game PRIVATE -w -ffreestanding -fno-stack-protector -O2)
   target_link_options(st_game PRIVATE -nostdlib)
+  endif()
 
   # SDL's Android activity loads the program as libmain.so and calls its SDL_main.
   add_library(main SHARED src/main.cpp src/game_module.cpp src/st_hooks.cpp src/st_stick.cpp src/st_pad.cpp src/st_text.cpp
@@ -49,7 +74,9 @@ if(ANDROID)
   target_compile_options(main PRIVATE -O2)
   target_link_libraries(main PRIVATE ntr_runtime ntr_common SDL3::SDL3-static android log
                         "$<LINK_GROUP:RESCAN,ntr_runtime,melonds_core>")
-  add_dependencies(main st_game)
+  if(NOT ST_SHELL)
+    add_dependencies(main st_game)
+  endif()
   return()
 endif()
 
@@ -106,12 +133,39 @@ endif()
 # ---- the program ----
 add_executable(SpiritTracks src/main.cpp src/game_module.cpp src/st_hooks.cpp src/st_stick.cpp src/st_pad.cpp src/st_text.cpp
                ${ST_HD_FONT_SRC} src/png.cpp src/gl_present.cpp src/menu.cpp)
+target_compile_definitions(SpiritTracks PRIVATE "ST_BUILD_LABEL=\"${ST_BUILD_LABEL}\"")
 target_include_directories(SpiritTracks PRIVATE src ${CMAKE_SOURCE_DIR}/third_party/stb)
 set_target_properties(SpiritTracks PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 if(ST_ROM)
   add_dependencies(SpiritTracks st_game)  # (built together, next to the program)
 endif()
 target_link_libraries(SpiritTracks PRIVATE ntr_runtime ntr_common SDL3::SDL3-static)
+
+# ---- first-run setup: the program builds st_game from the player's ROM itself (game_builder.cpp: the recompiler +
+# TinyCC, LGPL), into the data folder. Its headers and config are packed into the program. ----
+if(WIN32)
+  set(TCC_DIR ${CMAKE_SOURCE_DIR}/third_party/tinycc)
+  target_sources(SpiritTracks PRIVATE src/game_builder.cpp src/win_pick.cpp ${TCC_DIR}/libtcc.c)
+  target_link_libraries(SpiritTracks PRIVATE comdlg32)
+  set_source_files_properties(${TCC_DIR}/libtcc.c PROPERTIES COMPILE_OPTIONS "-w" COMPILE_DEFINITIONS "ONE_SOURCE=1")
+  set_source_files_properties(src/game_builder.cpp PROPERTIES INCLUDE_DIRECTORIES "${TCC_DIR}")
+  target_include_directories(SpiritTracks PRIVATE ${TCC_DIR}/config/windows)
+  target_link_libraries(SpiritTracks PRIVATE ntr_recomp)
+  target_compile_definitions(SpiritTracks PRIVATE ST_PC_SETUP=1)
+  # The compiler's support files are packed into the exe (unpacked to the data folder only while building).
+  set(ST_TOOLCHAIN_CPP ${CMAKE_CURRENT_BINARY_DIR}/embedded_toolchain_data.cpp)
+  file(GLOB_RECURSE ST_TOOLCHAIN_INPUTS CONFIGURE_DEPENDS ${TCC_DIR}/include/* ${TCC_DIR}/win32/lib/*
+       ${CMAKE_SOURCE_DIR}/runtime/include/* ${ST_CONFIG}/*)
+  add_custom_command(OUTPUT ${ST_TOOLCHAIN_CPP}
+    COMMAND ${CMAKE_COMMAND} -DOUT=${ST_TOOLCHAIN_CPP} -DTCC=${TCC_DIR} -DONDEVICE=${CMAKE_SOURCE_DIR}/tools/ondevice
+            -DRT=${CMAKE_SOURCE_DIR}/runtime/include -DCFG=${ST_CONFIG} -P ${CMAKE_SOURCE_DIR}/tools/embed_toolchain.cmake
+    DEPENDS ${CMAKE_SOURCE_DIR}/tools/embed_toolchain.cmake ${ST_TOOLCHAIN_INPUTS}
+            ${CMAKE_SOURCE_DIR}/tools/ondevice/stdint.h ${CMAKE_SOURCE_DIR}/tools/ondevice/string.h
+            ${CMAKE_SOURCE_DIR}/tools/ondevice/dllstart.c
+    VERBATIM)
+  target_sources(SpiritTracks PRIVATE src/embedded_toolchain.cpp ${ST_TOOLCHAIN_CPP})
+  set_source_files_properties(${ST_TOOLCHAIN_CPP} PROPERTIES INCLUDE_DIRECTORIES ${CMAKE_CURRENT_SOURCE_DIR}/src)
+endif()
 if(ST_GLES_SHADERS)  # (the gles-test preset: the phone's renderer, its ES shaders and gles_compat, on the PC)
   target_sources(SpiritTracks PRIVATE src/gles_compat.cpp)
   target_compile_definitions(SpiritTracks PRIVATE ST_GLES_TEST=1)

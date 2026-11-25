@@ -57,6 +57,15 @@
 #include "gl_present.hpp"
 #ifndef __ANDROID__
 #include "menu.hpp"
+#ifdef ST_PC_SETUP
+#include <thread>
+
+#include "game_builder.hpp"
+#include "embedded_toolchain.hpp"
+#ifdef _WIN32
+namespace st { std::string win_pick_rom(std::string& error); std::string win_exe_path(); }  // win_pick.cpp
+#endif
+#endif
 #endif
 
 namespace fs = std::filesystem;
@@ -96,7 +105,11 @@ extern "C" int ffcc_join_screens;  // (melonDS, third_party/CMakeLists.txt: two-
 
 namespace {
 
+#ifdef ST_BUILD_LABEL
+constexpr char kTitle[] = "The Legend of Zelda: Spirit Tracks - " ST_BUILD_LABEL;
+#else
 constexpr char kTitle[] = "The Legend of Zelda: Spirit Tracks";
+#endif
 constexpr int kW = 256, kH = 192;
 constexpr double kFrameSeconds = 560190.0 / 33513982.0;  // one DS frame (59.8261 Hz)
 constexpr int kScales[] = {2, 4, 6, 8};
@@ -1076,6 +1089,123 @@ void error_box(const std::string& text, SDL_Window* window = nullptr) {
     SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, kTitle, text.c_str(), window);
 }
 
+#ifdef ST_PC_SETUP
+// ---- first-run setup (PC): the player's ROM → st_game.dll in the data folder, built here (game_builder.cpp) ----
+
+// The system's open-file dialog; "" when cancelled.
+fs::path pick_rom_file() {
+#ifdef _WIN32
+    std::string error;
+    const std::string picked = st::win_pick_rom(error);
+    if (!error.empty()) error_box(error);
+    return picked.empty() ? fs::path() : fs::u8path(picked);
+#endif
+    struct Pick {
+        std::atomic<int> done{0};
+        std::string path;
+    } pick;
+    static const SDL_DialogFileFilter filters[] = {{"Nintendo DS ROM", "nds"}, {"All files", "*"}};
+    SDL_ShowOpenFileDialog(
+        [](void* user, const char* const* files, int) {
+            auto* p = static_cast<Pick*>(user);
+            if (files && files[0]) p->path = files[0];
+            p->done = 1;
+        },
+        &pick, nullptr, filters, 2, nullptr, false);
+    while (!pick.done) {
+        SDL_Event e;
+        while (SDL_PollEvent(&e)) {}
+        SDL_Delay(15);
+    }
+    return pick.path.empty() ? fs::path() : fs::u8path(pick.path);
+}
+
+// Asks for the ROM (until a supported one or Quit), keeps a copy in the data folder, builds the game with a progress
+// window. Returns false when the player quits or the build fails (after saying why).
+bool first_run_setup(const fs::path& base, const fs::path& data_dir, fs::path& rom_path, const fs::path& module) {
+    std::error_code ec;
+    const fs::path kept = data_dir / "rom" / "bkie.nds";
+    for (;;) {
+        if (!rom_path.empty() && fs::exists(rom_path, ec)) {
+            const std::vector<uint8_t> rom = read_file(rom_path);
+            const ntr::KnownRom* known = ntr::find_known_rom(ntr::sha1(rom));
+            if (!known) known = ntr::find_known_rom(rom);
+            if (known && known->supported && st::select_release(known->game_code)) {
+                if (rom_path != kept) {
+                    fs::create_directories(kept.parent_path(), ec);
+                    std::ofstream(kept, std::ios::binary).write(reinterpret_cast<const char*>(rom.data()),
+                                                                std::streamsize(rom.size()));
+                    rom_path = kept;
+                }
+                break;
+            }
+            error_box(rom_path.string() + " is not a supported Spirit Tracks dump (USA: clean, D-pad, or D-pad + QoL)."
+                      "\nSHA-1 " + ntr::to_hex(ntr::sha1(rom)));
+        }
+        const SDL_MessageBoxButtonData buttons[] = {
+            {SDL_MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT, 1, "Select ROM..."},
+            {SDL_MESSAGEBOX_BUTTON_ESCAPEKEY_DEFAULT, 0, "Quit"}};
+        const SDL_MessageBoxData box = {SDL_MESSAGEBOX_INFORMATION, nullptr, kTitle,
+            "Welcome! Select your own Spirit Tracks (USA) dump: the clean ROM or the D-pad / D-pad + QoL patch.\n\n"
+            "The game is then built on this PC from it, once (about a minute). Nothing is downloaded.",
+            2, buttons, nullptr};
+        int choice = 0;
+        if (!SDL_ShowMessageBox(&box, &choice) || choice != 1) return false;
+        rom_path = pick_rom_file();
+        if (rom_path.empty()) continue;
+    }
+
+    // ---- build, with a small progress window ----
+    SDL_Window* window = SDL_CreateWindow(kTitle, 520, 120, 0);
+    SDL_Renderer* renderer = window ? SDL_CreateRenderer(window, nullptr) : nullptr;
+    std::atomic<int> progress{0};
+    std::atomic<bool> finished{false};
+    std::string error;
+    std::thread worker([&] {
+        const auto u8 = [](const fs::path& p) { const auto s = p.u8string(); return std::string(s.begin(), s.end()); };
+        // The compiler's files travel inside the exe: unpack them next to the work folder, remove them afterwards.
+        const fs::path tools = data_dir / "build-tools";
+        error = st::unpack_toolchain(u8(tools));
+        if (error.empty())
+            error = st::build_game(u8(rom_path), u8(tools), u8(module), u8(data_dir / "build-work"), progress);
+        std::error_code rm_ec;
+        fs::remove_all(tools, rm_ec);
+        finished = true;
+    });
+    const uint64_t start = SDL_GetTicks();
+    while (!finished) {
+        SDL_Event e;
+        while (SDL_PollEvent(&e)) {}  // (closing the window waits for the build: TinyCC can't be stopped midway)
+        const int p = progress;
+        if (window) {
+            const std::string title = std::string(p < 20 ? "Recompiling your ROM... " : "Building the game... ") +
+                                      std::to_string(p) + "%";
+            SDL_SetWindowTitle(window, title.c_str());
+        }
+        if (renderer) {
+            SDL_SetRenderDrawColor(renderer, 24, 26, 30, 255);
+            SDL_RenderClear(renderer);
+            const SDL_FRect back = {20, 50, 480, 20}, bar = {20, 50, 480.0f * float(p) / 100.0f, 20};
+            SDL_SetRenderDrawColor(renderer, 60, 64, 72, 255);
+            SDL_RenderFillRect(renderer, &back);
+            SDL_SetRenderDrawColor(renderer, 47, 158, 110, 255);
+            SDL_RenderFillRect(renderer, &bar);
+            SDL_RenderPresent(renderer);
+        }
+        SDL_Delay(30);
+    }
+    worker.join();
+    if (renderer) SDL_DestroyRenderer(renderer);
+    if (window) SDL_DestroyWindow(window);
+    if (!error.empty()) {
+        error_box("The game could not be built:\n" + error);
+        return false;
+    }
+    std::fprintf(stderr, "setup: game built in %.1f s\n", double(SDL_GetTicks() - start) / 1000.0);
+    return true;
+}
+#endif
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -1083,7 +1213,7 @@ int main(int argc, char** argv) {
     fs::path rom_path, save_path, data_dir, script_path, module_path = st::default_module_path();
     uint64_t exit_after = 0;
     bool fullscreen_arg = false, unpaced = false, read_only_save = false, continue_arg = false, wide_arg = false, wide21_arg = false, wide1610_arg = false;
-    bool fps_probe_arg = false, hd_text_arg = false;
+    bool fps_probe_arg = false, hd_text_arg = false, setup_arg = false;
     std::string renderer_arg, textures_arg;
     int scale_arg = 0, fixes_arg = -1, language_arg = -2;
     for (int i = 1; i < argc; i++) {
@@ -1107,6 +1237,7 @@ int main(int argc, char** argv) {
         else if (a == "--textures" && has) textures_arg = argv[++i];
         else if (a == "--fixes" && has) fixes_arg = std::atoi(argv[++i]);
         else if (a == "--hd-text") hd_text_arg = true;
+        else if (a == "--setup") setup_arg = true;  // (PC: build the game again from the kept ROM, or a new one)
         else if (a == "--language" && has) {
             language_arg = parse_language(argv[++i]);
             if (language_arg < kLangAuto) {
@@ -1141,6 +1272,39 @@ int main(int argc, char** argv) {
             SDL_free(pref);
         }
     }
+#ifdef __ANDROID__
+    // A shell APK (built with -PstShell) carries no game: the recompiled game is copied beside the ROM instead
+    // (game/libst_game.so in the app's files), so a change to the program needs only the small APK reinstalled. A
+    // module there is used in either APK.
+    // (SDL_GetBasePath is not the files dir on Android: use the internal storage path.)
+    if (const char* files = SDL_GetAndroidInternalStoragePath();
+        files && module_path == st::default_module_path() && fs::exists(fs::path(files) / "game" / "libst_game.so", ec))
+        module_path = fs::path(files) / "game" / "libst_game.so";
+#endif
+#ifdef ST_PC_SETUP
+    // No st_game next to the program (a release zip): the game lives in the data folder, built here from the player's
+    // ROM on the first start (or with --setup); the ROM is kept there too.
+    if (module_path == st::default_module_path() && !fs::exists(module_path, ec)) {
+        module_path = data_dir / "game" / "st_game.dll";
+        if (rom_path.empty() && !fs::exists(base / "rom" / "bkie.nds", ec) && fs::exists(data_dir / "rom" / "bkie.nds", ec))
+            rom_path = data_dir / "rom" / "bkie.nds";
+        // The built game belongs to the exe that built it (its runtime, recompiler and hook lists): a new exe (an
+        // update) rebuilds it from the kept ROM, without asking. game/st_game.id holds the builder exe's SHA-1.
+        const fs::path id_path = data_dir / "game" / "st_game.id";
+        std::string exe_id;
+        if (const std::string exe = st::win_exe_path(); !exe.empty())
+            if (const std::vector<uint8_t> bytes = read_file(fs::u8path(exe)); !bytes.empty())
+                exe_id = ntr::to_hex(ntr::sha1(bytes));
+        std::string built_id;
+        if (std::ifstream f(id_path); f) std::getline(f, built_id);
+        const bool stale = !exe_id.empty() && built_id != exe_id;
+        if (setup_arg || stale || !fs::exists(module_path, ec)) {
+            if (rom_path.empty() && fs::exists(base / "rom" / "bkie.nds", ec)) rom_path = base / "rom" / "bkie.nds";
+            if (!first_run_setup(base, data_dir, rom_path, module_path)) return 0;
+            if (!exe_id.empty()) std::ofstream(id_path) << exe_id << '\n';
+        }
+    }
+#endif
     if (rom_path.empty()) rom_path = base / "rom" / "bkie.nds";
     if (save_path.empty()) save_path = data_dir / "saves" / "bkie.sav";
     const fs::path settings_path = data_dir / "settings.ini";
