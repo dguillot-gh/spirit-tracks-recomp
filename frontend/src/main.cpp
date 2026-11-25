@@ -103,7 +103,11 @@ std::atomic<int> map_dy{0};
 
 namespace {
 
+#ifdef ST_BUILD_LABEL
+constexpr char kTitle[] = "The Legend of Zelda: Spirit Tracks - " ST_BUILD_LABEL;
+#else
 constexpr char kTitle[] = "The Legend of Zelda: Spirit Tracks";
+#endif
 constexpr int kW = 256, kH = 192;
 constexpr double kFrameSeconds = 560190.0 / 33513982.0;  // one DS frame (59.8261 Hz)
 constexpr int kScales[] = {2, 4, 6, 8};

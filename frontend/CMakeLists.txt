@@ -15,6 +15,20 @@ if(ST_ROM AND EXISTS "${ST_ROM}")
   message(STATUS "Spirit Tracks config: ${ST_CONFIG_CODE}")
 endif()
 set(ST_CONFIG ${CMAKE_CURRENT_SOURCE_DIR}/config/${ST_CONFIG_CODE})
+# The version and commit the program shows (menu header, window title): "v0.1.0 (abc1234)", "-dirty" with local changes.
+execute_process(COMMAND git rev-parse --short=7 HEAD WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+                OUTPUT_VARIABLE ST_GIT_COMMIT OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
+execute_process(COMMAND git status --porcelain --untracked-files=no WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+                OUTPUT_VARIABLE ST_GIT_DIRTY OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
+if(NOT ST_GIT_COMMIT)
+  set(ST_GIT_COMMIT "unknown")
+elseif(ST_GIT_DIRTY)
+  string(APPEND ST_GIT_COMMIT "-dirty")
+endif()
+set(ST_BUILD_LABEL "v${PROJECT_VERSION} (${ST_GIT_COMMIT})")
+if(EXISTS ${CMAKE_SOURCE_DIR}/.git)
+  set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/.git)
+endif()
 
 # Embedded HD font (Inter Bold, SIL OFL 1.1) for optional vector text rendering.
 set(ST_HD_FONT_SRC ${CMAKE_CURRENT_BINARY_DIR}/hd_font_data.cpp)
@@ -119,6 +133,7 @@ endif()
 # ---- the program ----
 add_executable(SpiritTracks src/main.cpp src/game_module.cpp src/st_hooks.cpp src/st_stick.cpp src/st_text.cpp
                ${ST_HD_FONT_SRC} src/png.cpp src/gl_present.cpp src/menu.cpp)
+target_compile_definitions(SpiritTracks PRIVATE "ST_BUILD_LABEL=\"${ST_BUILD_LABEL}\"")
 target_include_directories(SpiritTracks PRIVATE src ${CMAKE_SOURCE_DIR}/third_party/stb)
 set_target_properties(SpiritTracks PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 if(ST_ROM)
