@@ -5,7 +5,7 @@ name: Windows exe + Android shell APK
 on:
   workflow_dispatch:
   push:
-    tags: ['build-*']
+    tags: ['build-*', 'v*']  # v*: also publish a GitHub Release with the exe and the APK as plain files
 jobs:
   windows:
     runs-on: windows-latest
@@ -69,3 +69,31 @@ jobs:
         with:
           name: SpiritTracks-android-shell
           path: android/app/build/outputs/apk/debug/app-debug.apk
+  release:
+    # Only for v* tags: one Release per version, the files attached as they are (no zip), no game data in either.
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [windows, android]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: art
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir out
+          cp art/SpiritTracks-windows/SpiritTracks.exe out/SpiritTracks.exe
+          cp art/SpiritTracks-android-shell/app-debug.apk out/SpiritTracks.apk
+          (cd out && sha256sum SpiritTracks.exe SpiritTracks.apk > SHA256SUMS.txt)
+          {
+            echo "You need your own Spirit Tracks (USA) ROM: the game is built from it on your PC or phone the first time (about a minute). Nothing from the game is included here."
+            echo
+            echo "- Windows: download SpiritTracks.exe, run it, select your ROM."
+            echo "- Android: install SpiritTracks.apk, then import your ROM in the app."
+            echo
+            echo "Built from commit ${GITHUB_SHA::7}."
+          } > notes.md
+          gh release create "$GITHUB_REF_NAME" out/* -R "$GITHUB_REPOSITORY" --title "Spirit Tracks Recomp $GITHUB_REF_NAME" --notes-file notes.md $([[ "$GITHUB_REF_NAME" == *-* ]] && echo --prerelease)
