@@ -6,7 +6,7 @@ on:
     branches: [feature/pc-setup]
   workflow_dispatch:
 jobs:
-  build:
+  windows:
     runs-on: windows-latest
     defaults:
       run:
