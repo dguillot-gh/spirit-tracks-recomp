@@ -119,6 +119,12 @@ final class LauncherLook {
         int width = upright ? -1 : Math.min(dp(MENU_WIDTH_DP), a.getResources().getDisplayMetrics().widthPixels);
         root.addView(scroll, new FrameLayout.LayoutParams(width, -1, Gravity.START));
 
+        // The version, bottom right on every start screen ("v0.2.0 (4527a78)").
+        TextView version = text("v" + BuildConfig.VERSION_NAME + " (" + BuildConfig.COMMIT + ")", 11, 0x99FFFFFF, false);
+        FrameLayout.LayoutParams vlp = new FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM | Gravity.END);
+        vlp.setMargins(0, 0, dp(16), dp(10));
+        root.addView(version, vlp);
+
         column.addView(text(title, 28, Color.WHITE, true));
         TextView sub = text(subtitle, 14, 0xFFB8C7E0, false);
         sub.setPadding(0, dp(2), 0, dp(16));

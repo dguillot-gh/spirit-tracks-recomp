@@ -58,7 +58,7 @@ jobs:
           code=$(( ($(date +%s) - 1767225600) / 60 ))
           name="0.0.0-${GITHUB_SHA::7}"; [[ "$GITHUB_REF" == refs/tags/v* ]] && name="${GITHUB_REF_NAME#v}"
           echo "code=$code" >> "$GITHUB_OUTPUT"
-          args="-PstVersionCode=$code -PstVersionName=$name -PstUpdateRepo=$GITHUB_REPOSITORY"
+          args="-PstVersionCode=$code -PstVersionName=$name -PstUpdateRepo=$GITHUB_REPOSITORY -PstCommit=${GITHUB_SHA::7}"
           # The release key (repo secrets): every APK signed the same, so updates install over each other.
           if [ -n "$ST_KEYSTORE_B64" ]; then
             echo "$ST_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/release.jks"

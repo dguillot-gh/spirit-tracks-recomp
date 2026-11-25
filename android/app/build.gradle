@@ -21,6 +21,11 @@ def keystore = project.findProperty('stKeystore')
 def versionCodeProp = (project.findProperty('stVersionCode') ?: '1') as int
 def versionNameProp = project.findProperty('stVersionName') ?: '0.1.0'
 def updateRepo = project.findProperty('stUpdateRepo') ?: ''
+// The commit, shown on the start screen beside the version (CI passes -PstCommit; locally, git).
+def commit = project.findProperty('stCommit') ?: {
+    try { ['git', '-C', repo.path, 'rev-parse', '--short=7', 'HEAD'].execute().text.trim() ?: 'local' }
+    catch (Exception ignored) { 'local' }
+}()
 
 android {
     namespace = "com.strecomp.st"
@@ -33,6 +38,7 @@ android {
         versionCode versionCodeProp
         versionName versionNameProp
         buildConfigField "String", "UPDATE_REPO", "\"${updateRepo}\""
+        buildConfigField "String", "COMMIT", "\"${commit}\""
         buildConfigField "String", "ROM_SHA1", "\"${romSha1}\""
         buildConfigField "String", "ROM_VARIANT", "\"${romVariant}\""
         // A shell APK (-PstShell) has no game inside: the launcher asks for the game module (libst_game.so).
