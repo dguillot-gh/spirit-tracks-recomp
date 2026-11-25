@@ -211,6 +211,10 @@ Analysis analyze(const Program& program) {
     // below. Only `before` and `instead` hooks can wait: a `replace` hook changes how the function is explored.
     std::vector<const Hook*> later;
     for (const Hook& h : program.config.hooks) {
+        if (h.at || h.expect) {  // (placed once every body is known: below)
+            later.push_back(&h);
+            continue;
+        }
         auto it = out.index.find({h.module, h.addr});
         if (it == out.index.end()) {
             if (h.instead || h.before) later.push_back(&h);
@@ -236,12 +240,38 @@ Analysis analyze(const Program& program) {
     for (size_t i = 0; i < known; i++) b.explore(i);
     drain();
     for (const Hook* h : later) {
+        if (h->at) {  // every function whose body holds the instruction (a body may run on into another's code)
+            int placed = 0, differs = 0;
+            for (Function& f : out.functions) {
+                if (f.module != h->module) continue;
+                auto in = f.instrs.find(h->addr);
+                if (in == f.instrs.end()) continue;
+                if (h->expect && in->second.op != h->expect_op) {
+                    differs++;
+                    continue;
+                }
+                f.hook_at[h->addr] = h->replacement;
+                placed++;
+            }
+            if (differs && !placed)
+                out.warnings.push_back("hook left out (other code at " + hex(h->addr) + "): " + h->replacement);
+            else if (!placed)
+                out.warnings.push_back("hook target is not a known instruction: " + hex(h->addr));
+            continue;
+        }
         auto it = out.index.find({h->module, h->addr});
         if (it == out.index.end()) {
             out.warnings.push_back("hook target is not a known function: " + hex(h->addr));
             continue;
         }
         Function& f = out.functions[it->second];
+        if (h->expect) {
+            auto in = f.instrs.find(h->addr);
+            if (in == f.instrs.end() || in->second.op != h->expect_op) {
+                out.warnings.push_back("hook left out (other code at " + hex(h->addr) + "): " + h->replacement);
+                continue;
+            }
+        }
         (h->instead ? f.hook_instead : f.hook_before) = h->replacement;
     }
     out.discovered = out.functions.size() - seeds;

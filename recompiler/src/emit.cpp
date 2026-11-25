@@ -104,6 +104,10 @@ public:
                 line(fmt("c->cycles += %zu;", n));
             }
             if (fn_.labels.count(in.addr)) known_.clear();
+            if (auto hk = fn_.hook_at.find(in.addr); hk != fn_.hook_at.end()) {
+                line(hk->second + "(c);");  // (it may change any register)
+                known_.clear();
+            }
             cur_ = &in;
             if (in.thumb)
                 emit_thumb(in);
@@ -762,6 +766,7 @@ EmitStats emit_c(const Program& program, const Analysis& analysis, const std::fi
             if (!f->hook.empty()) hooks.insert(f->hook);
             if (!f->hook_before.empty()) hooks.insert(f->hook_before);
             if (!f->hook_instead.empty()) instead_hooks.insert(f->hook_instead);
+            for (const auto& [a, hk] : f->hook_at) hooks.insert(hk);
         }
         // The hooks live in the host: the module calls them through pointers that ntr_game_load fills in by name.
         for (const std::string& hk : hooks)

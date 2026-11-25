@@ -152,13 +152,21 @@ Config load_config(const Program& program, const std::filesystem::path& dir) {
         line = trim(line);
         if (line.empty()) continue;
         std::istringstream ss(line);
-        std::string mod, addr, kind, repl;
+        std::string mod, addr, kind, repl, expect;
         ss >> mod >> addr >> kind >> repl;
         const Module* m = program.module_by_name(mod);
-        if (!m || (kind != "replace" && kind != "before" && kind != "instead") || repl.empty())
+        bool bad = !m || (kind != "replace" && kind != "before" && kind != "instead" && kind != "at") || repl.empty();
+        Hook hk{};
+        if (!bad && ss >> expect) {  // optional "=<instruction word>": the hook applies only where the code is that
+            bad = expect.size() < 2 || expect[0] != '=' || kind == "replace";
+            if (!bad) hk.expect = true, hk.expect_op = uint32_t(std::stoul(expect.substr(1), nullptr, 16));
+        }
+        if (bad)
             throw std::runtime_error("hooks.txt:" + std::to_string(lineno) +
-                                     ": expected '<module> <addr> replace|before|instead <c_function>'");
-        cfg.hooks.push_back({m->id, uint32_t(std::stoul(addr, nullptr, 16)), repl, kind == "before", kind == "instead"});
+                                     ": expected '<module> <addr> replace|before|instead|at <c_function> [=<word>]'");
+        hk.module = m->id, hk.addr = uint32_t(std::stoul(addr, nullptr, 16)), hk.replacement = repl;
+        hk.before = kind == "before", hk.instead = kind == "instead", hk.at = kind == "at";
+        cfg.hooks.push_back(hk);
     }
     return cfg;
 }

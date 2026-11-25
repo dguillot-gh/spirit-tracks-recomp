@@ -59,6 +59,9 @@ struct Hook {
     std::string replacement;  // C function name taking (NtrCpu*)
     bool before = false;      // call it on entry, then run the recompiled body (instead of replacing the body)
     bool instead = false;     // call it on entry; it returns nonzero if it did the call, 0 to run the recompiled body
+    bool at = false;          // call it just before the instruction at addr, in every function that holds it
+    bool expect = false;      // only if the instruction there (the entry's, or addr's for `at`) is expect_op:
+    uint32_t expect_op = 0;   // a hook for one release's code is then left out of a build made from a patched ROM
 };
 
 struct Config {
@@ -126,6 +129,7 @@ struct Function {
     std::string hook;  // non-empty: body replaced by a call to this C function
     std::string hook_before;  // non-empty: called on entry, before the recompiled body
     std::string hook_instead;  // non-empty: called on entry; the recompiled body runs if it returns 0
+    std::map<uint32_t, std::string> hook_at;  // called just before the instruction at the address
     bool encrypted = false;
     std::map<uint32_t, Instr> instrs;
     std::set<uint32_t> labels;
