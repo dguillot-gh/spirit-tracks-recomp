@@ -39,7 +39,8 @@ program and Android app, set up for Spirit Tracks.
 - D-pad controls and an analog stick (on-screen or a gamepad's left stick: walk with a light push, run at the rim),
   **with no ROM patch needed**: the port does what d0k3's D-pad patch does in the game's code itself, so a build from
   your clean dump has them too
-- Your clean USA dump, the D-pad patch or the D-pad + QoL patch: one build plays all three (built from the D-pad + QoL
+- Plays the USA 1.0 release, not 1.1 (see [Which versions work](#which-versions-work)). Your clean dump, the
+  D-pad patch or the D-pad + QoL patch: one build plays all three (built from the D-pad + QoL
   ROM by default; the QoL changes come only with the QoL ROM)
 - 12 save-state slots with pictures, plus Continue from where you quit
 - Language: Auto (the system's), English, French or Spanish, the three the USA ROM carries, plus German and Italian
@@ -83,23 +84,32 @@ Ideas and features being considered next: [docs/WISHLIST.md](docs/WISHLIST.md).
 
 ## What you need
 
-- Your own dump: *Legend of Zelda, The - Spirit Tracks (USA, Australia) (En,Fr,Es)*, SHA-1
-  `1f0921b5e99db9d92d24710f1b004e4f3c997b73` (found by its SHA-1, whatever its name). USA Rev 1 is not supported.
+- Your own dump of the game. Which release you have matters: the program knows a dump by its SHA-1, whatever the
+  file is called.
+
+  ### Which versions work
+
+  | Release (No-Intro name) | SHA-1 | Plays? | D-pad and analog stick |
+  |---|---|---|---|
+  | **USA 1.0** — *Legend of Zelda, The - Spirit Tracks (USA, Australia) (En,Fr,Es)* | `1f0921b5e99db9d92d24710f1b004e4f3c997b73` | **Yes** (the main target) | **Yes, native**, no patch needed (tested on a phone) |
+  | USA 1.0 with d0k3's D-pad patch v0.9c | `6a63d88702c34da626e273dfca4931d52ac4551b` | Yes | Yes (the patch's own code) |
+  | USA 1.0 with d0k3's D-pad + QoL patch v0.9c | `6896c1db2b3a725cb991f711a875fc2228b7620e` | Yes (the default build) | Yes, plus the patch's QoL changes |
+  | **USA 1.1** — *Legend of Zelda, The - Spirit Tracks (USA) (En,Fr,Es) (Rev 1)* | `9953bce6ce32c35d084300c32b555b40aa013047` | **No, not supported** | — |
+  | Europe Rev 0 — *Legend of Zelda, The - Spirit Tracks (Europe) (En,Fr,De,Es,It)* | `9e99cc803a14ce038eb908db585431f8254f09ee` | Test (`-Variant eur`), untried | Mapped, untested |
+  | Europe Rev 1 — *… (Europe) (En,Fr,De,Es,It) (Rev 1)* | `dcb221a89acb894503a461c2c7d4cfdad9a06b68`, `b9096f46e9163750a9e3f6c2fc0758e6094b6135`, `b0288a880498c12508e53f4373085eb88955e14b`, `4efbff9a263fe622f3f7e7cfb7bea8046b86e57d` or `52d7f22255d5d86fc40d3a43c7de969e0365ff7d` | Test (`-Variant eur`), untried | Mapped, untested |
+
+  - **Get the USA 1.0 release.** USA 1.1 (Rev 1) is a rebuild of the game: nearly all of its code moved, so the port
+    can't use it at all yet. If your dump's SHA-1 isn't in this table, it won't build.
+  - To see your dump's SHA-1 on Windows: `Get-FileHash -Algorithm SHA1 your-dump.nds` in PowerShell.
+  - Dump your own cartridge (for example with a DS homebrew dumper such as GodMode9i). No-Intro's names above are what
+    a dump usually gets called; the box doesn't say which revision a cartridge is, so check the SHA-1.
+  - Europe builds with `-Variant eur` (each script takes it, e.g. `RUN-ALL.ps1 -Variant eur`). Its addresses come
+    from the zeldaret/st decomp and haven't been tried on a real European ROM yet: reports welcome. An APK plays the
+    revision it was built from.
+
 - Optional: d0k3's *DPAD & QoL Hack v0.9c* (the folder `loz_st_dpad_qol-v0.9c` with its BPS files), for its QoL
-  changes (L / R blow the Spirit Flute and speed up the train, and more). The D-pad controls and the analog stick no
-  longer need it: a build from your clean dump (`-Variant clean`) has them.
-
-  | ROM | SHA-1 |
-  |---|---|
-  | USA (clean) | `1f0921b5e99db9d92d24710f1b004e4f3c997b73` |
-  | USA, D-pad patch v0.9c | `6a63d88702c34da626e273dfca4931d52ac4551b` |
-  | USA, D-pad + QoL patch v0.9c | `6896c1db2b3a725cb991f711a875fc2228b7620e` |
-
-- Or, in test: *Legend of Zelda, The - Spirit Tracks (Europe) (En,Fr,De,Es,It)*, Revision 0
-  (`9e99cc803a14ce038eb908db585431f8254f09ee`) or Revision 1 (`dcb221a89acb894503a461c2c7d4cfdad9a06b68`,
-  `b9096f46e9163750a9e3f6c2fc0758e6094b6135`, `b0288a880498c12508e53f4373085eb88955e14b`,
-  `4efbff9a263fe622f3f7e7cfb7bea8046b86e57d` or `52d7f22255d5d86fc40d3a43c7de969e0365ff7d`), built with
-  `-Variant eur` (each script takes it, e.g. `RUN-ALL.ps1 -Variant eur`). An APK plays the revision it was built from.
+  changes (L / R blow the Spirit Flute and speed up the train, and more). It applies to USA 1.0 only. The D-pad
+  controls and the analog stick no longer need it: a build from your clean dump (`-Variant clean`) has them.
 
 - Windows 10/11 64-bit, about 10 GB of disk, and an OpenGL 3.3 GPU for the GPU renderers.
 - For Android: an Android 8+ arm64 phone (OpenGL ES 3.2 for the GPU renderers) and a USB cable.
@@ -116,7 +126,7 @@ waiting. Step by step:
    ```
    Close PowerShell and open it again afterwards.
 2. **Make a folder for everything**, for example `C:\Games\st-workspace`, and inside it a folder named `roms`. Put
-   your Spirit Tracks dump (USA) in `roms` (any file name).
+   your Spirit Tracks dump (USA 1.0) in `roms` (any file name).
 3. **Optional, for the QoL patch's extras:** put d0k3's patch folder `loz_st_dpad_qol-v0.9c` in `roms\patches\`.
    Without it, build with `-Variant clean`: the D-pad controls and the analog stick work all the same.
 4. **Download the project** into that folder. In PowerShell, paste these two lines (change the path if you used another
