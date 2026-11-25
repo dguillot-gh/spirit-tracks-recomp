@@ -77,8 +77,41 @@ public final class LauncherActivity extends Activity {
     /** The recompiled game, for a shell APK (BuildConfig.SHELL): frontend main.cpp loads it from here when present. */
     private File module() { return new File(getFilesDir(), "game/libst_game.so"); }
 
-    private static final String MODULE_HELP = "The game is built on this phone from your ROM: nothing is downloaded. "
-            + "It takes about a minute, once.";
+    private static final String MODULE_HELP = "The game is built on this phone from your ROM: nothing from the game is "
+            + "downloaded. It takes about a minute, once.";
+
+    /** Which app install the game module was built by (lastUpdateTime:versionCode); a newer app rebuilds it. */
+    private File moduleStamp() { return new File(getFilesDir(), "game/built-for.txt"); }
+
+    private String appStamp() {
+        try {
+            return getPackageManager().getPackageInfo(getPackageName(), 0).lastUpdateTime + ":" + BuildConfig.VERSION_CODE;
+        } catch (android.content.pm.PackageManager.NameNotFoundException e) {
+            return "";
+        }
+    }
+
+    private void stampModule() {
+        try (FileOutputStream out = new FileOutputStream(moduleStamp())) {
+            out.write(appStamp().getBytes("UTF-8"));
+        } catch (IOException ignored) {
+            // (no stamp: the module is taken as current)
+        }
+    }
+
+    /** True when the app was updated since the game was built (the new engine needs the game built again). A module
+     *  without a stamp (copied in by the PC scripts, or built before stamps) is taken as current. */
+    private boolean moduleStale() {
+        if (!BuildConfig.SHELL || !module().isFile() || !moduleStamp().isFile()) return false;
+        try (BufferedReader r = new BufferedReader(new FileReader(moduleStamp()))) {
+            final String line = r.readLine();
+            return line == null || !line.trim().equals(appStamp());
+        } catch (IOException e) {
+            return false;
+        }
+    }
+
+    private boolean building;
 
     private File save() { return new File(getFilesDir(), "saves/bkie.sav"); }
 
@@ -113,7 +146,7 @@ public final class LauncherActivity extends Activity {
     private static final String TITLE = "The Legend of Zelda\nSpirit Tracks";
     private static final String SUBTITLE = "Nintendo DS · native Android port";
     private static final String ROM_HELP = "Choose your Spirit Tracks ROM (" + release() + "), the release this app "
-            + "was built for (the PC scripts copy it in for you). Nothing is downloaded. A save from melonDS (.sav) "
+            + "was built for (the PC scripts copy it in for you). Nothing from the game is downloaded. A save from melonDS (.sav) "
             + "can be imported afterwards under Save file.";
     private static final String SAVE_NAME = "SpiritTracks.sav";
     private static final boolean GPU_DEFAULT = true;   // GameActivity: prefs.getBoolean("gpu", ...)
@@ -133,6 +166,7 @@ public final class LauncherActivity extends Activity {
         super.onResume();
         look.hideSystemBars();
         refresh();
+        UpdateCheck.maybeCheck(this, prefs(), this::refresh);
         if (getIntent() != null && getIntent().getBooleanExtra(EXTRA_RELAUNCH, false)) {
             getIntent().removeExtra(EXTRA_RELAUNCH);
             if (resume("state").isFile()) relaunchWhenGameGone(System.currentTimeMillis() + 4000);
@@ -168,9 +202,13 @@ public final class LauncherActivity extends Activity {
             final TextView info = look.text(MODULE_HELP, 15, 0xFFDDDDDD, false);
             info.setPadding(0, look.dp(8), 0, look.dp(20));
             column.addView(info);
-            look.button(column, "Build the game", null, this::buildGame).requestFocus();
+            look.button(column, "Build the game", null, () -> buildGame(false)).requestFocus();
             look.button(column, "Use a game module built on a PC…", "libst_game.so", () -> pick(PICK_MODULE));
             return;
+        }
+        if (moduleStale() && !building) {
+            // The app was updated: build the game again for the new version first (the ROM is kept; saves stay).
+            column.post(() -> buildGame(true));
         }
         final View first;
         if (resume("state").isFile()) {
@@ -182,6 +220,10 @@ public final class LauncherActivity extends Activity {
             first = look.button(column, "Start game", "From the title screen",
                     () -> startActivity(new Intent(this, GameActivity.class)));
         }
+        final String update = UpdateCheck.available(prefs());
+        if (update != null)
+            look.button(column, "Update to " + update, "A new version is out: download it from GitHub (saves stay)",
+                    () -> UpdateCheck.install(this, prefs()));
         final LinearLayout row = look.row(column);
         look.small(row, "Save file", this::saveFile);
         look.small(row, "Settings", () -> look.settings(prefs(), GPU_DEFAULT, this::refresh));
@@ -214,7 +256,7 @@ public final class LauncherActivity extends Activity {
                         .format(new Date(module().lastModified())) : "none") + ". Rebuild it after an app update." : ""))
                 .setPositiveButton("Choose ROM…", (d, w) -> pick(PICK_ROM))
                 .setNegativeButton("Back", null);
-        if (BuildConfig.SHELL) b.setNeutralButton("Rebuild game", (d, w) -> buildGame());
+        if (BuildConfig.SHELL) b.setNeutralButton("Rebuild game", (d, w) -> buildGame(false));
         b.show();
     }
 
@@ -263,15 +305,18 @@ public final class LauncherActivity extends Activity {
             final boolean build = BuildConfig.SHELL && request == PICK_ROM && m.startsWith("Game ROM ready");
             runOnUiThread(() -> {
                 refresh();
-                if (build) buildGame();  // (a new ROM needs its own game)
+                if (build) buildGame(false);  // (a new ROM needs its own game)
                 else new AlertDialog.Builder(this).setMessage(m).setPositiveButton("OK", null).show();
             });
         }).start();
     }
 
     /** Shell APK: builds files/game/libst_game.so from the ROM on the phone (GameBuilder), with a progress dialog. */
-    private void buildGame() {
-        final AlertDialog dialog = new AlertDialog.Builder(this).setTitle("Building the game")
+    private void buildGame(boolean afterUpdate) {
+        if (building) return;
+        building = true;
+        final AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle(afterUpdate ? "App updated: building the game again" : "Building the game")
                 .setMessage("Recompiling your ROM…").setCancelable(false).show();
         final long start = System.currentTimeMillis();
         final Runnable tick = new Runnable() {
@@ -288,8 +333,10 @@ public final class LauncherActivity extends Activity {
             module().delete();
             runOnUiThread(tick);
             final String error = GameBuilder.run(this, rom(), module());
+            if (error == null) stampModule();
             final long secs = (System.currentTimeMillis() - start) / 1000;
             runOnUiThread(() -> {
+                building = false;
                 dialog.dismiss();
                 refresh();
                 new AlertDialog.Builder(this).setMessage(error == null
@@ -336,6 +383,7 @@ public final class LauncherActivity extends Activity {
         }
         if (dest.exists() && !dest.delete()) throw new IOException("cannot replace the game module");
         if (!tmp.renameTo(dest)) throw new IOException("cannot store the game module");
+        stampModule();
         return "Game module ready (" + (dest.length() >> 20) + " MB). Press Start game.";
     }
 

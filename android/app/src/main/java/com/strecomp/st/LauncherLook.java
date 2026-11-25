@@ -259,10 +259,12 @@ final class LauncherLook {
                 (p.getBoolean("hd_text", false) ? "✓ " : "   ") + "HD dialogue text",
                 (p.getBoolean("stretch", false) ? "✓ " : "   ") + "Stretch to fill the screen",
                 (p.getBoolean("portrait", false) ? "✓ " : "   ") + "Hold the phone upright (both screens stacked)",
+                UpdateCheck.supported() ? (UpdateCheck.enabled(p) ? "✓ " : "   ") + "Check GitHub for app updates"
+                        : "   App updates: not for this build (made on a PC)",
                 "Choose background image…",
                 hasCustomBackground() ? "Use the game's cover again" : null,
         };
-        int n = items[8] == null ? 8 : 9;
+        int n = items[9] == null ? 9 : 10;
         String[] shown = java.util.Arrays.copyOf(items, n);
         dialog().setTitle("Settings").setItems(shown, (d, w) -> {
             switch (w) {
@@ -290,8 +292,12 @@ final class LauncherLook {
                 case 4: p.edit().putBoolean("hd_text", !p.getBoolean("hd_text", false)).apply(); break;
                 case 5: p.edit().putBoolean("stretch", !p.getBoolean("stretch", false)).apply(); break;
                 case 6: p.edit().putBoolean("portrait", !p.getBoolean("portrait", false)).apply(); break;
-                case 7: pickBackground(); return;
-                case 8: clearBackground(); changed.run(); return;
+                case 7:
+                    if (!UpdateCheck.supported()) return;
+                    p.edit().putBoolean(UpdateCheck.PREF_ON, !UpdateCheck.enabled(p)).apply();
+                    break;
+                case 8: pickBackground(); return;
+                case 9: clearBackground(); changed.run(); return;
                 default: return;
             }
             changed.run();

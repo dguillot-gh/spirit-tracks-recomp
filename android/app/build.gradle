@@ -13,6 +13,14 @@ def ninja = project.findProperty('stNinja')
 // The ROM the game's C was recompiled from (5-BUILD-ANDROID.ps1 passes it): the launcher takes only that ROM.
 def romSha1 = project.findProperty('stRomSha1') ?: ''
 def romVariant = project.findProperty('stRomVariant') ?: 'USA'
+// Release builds (CI): one fixed key, so each new APK installs over the last one and keeps the player's saves.
+// -PstKeystore=<file> -PstKeystorePassword -PstKeyAlias -PstKeyPassword; without them, the usual debug key.
+def keystore = project.findProperty('stKeystore')
+// -PstVersionCode (must grow with every release: CI passes minutes since 2026), -PstVersionName (the tag),
+// -PstUpdateRepo (owner/name: the launcher checks that repo's GitHub Releases for a newer APK; empty: no check).
+def versionCodeProp = (project.findProperty('stVersionCode') ?: '1') as int
+def versionNameProp = project.findProperty('stVersionName') ?: '0.1.0'
+def updateRepo = project.findProperty('stUpdateRepo') ?: ''
 
 android {
     namespace = "com.strecomp.st"
@@ -22,8 +30,9 @@ android {
         applicationId "com.strecomp.st"
         minSdkVersion 26
         targetSdkVersion 35
-        versionCode 1
-        versionName "0.1.0"
+        versionCode versionCodeProp
+        versionName versionNameProp
+        buildConfigField "String", "UPDATE_REPO", "\"${updateRepo}\""
         buildConfigField "String", "ROM_SHA1", "\"${romSha1}\""
         buildConfigField "String", "ROM_VARIANT", "\"${romVariant}\""
         // A shell APK (-PstShell) has no game inside: the launcher asks for the game module (libst_game.so).
@@ -44,8 +53,19 @@ android {
             }
         }
     }
+    if (keystore) {
+        signingConfigs {
+            stRelease {
+                storeFile file(keystore)
+                storePassword project.findProperty('stKeystorePassword')
+                keyAlias project.findProperty('stKeyAlias')
+                keyPassword project.findProperty('stKeyPassword')
+            }
+        }
+    }
     buildTypes {
         debug {
+            if (keystore) signingConfig signingConfigs.stRelease
             // The game and the engine are always optimised (CMake), so the debug APK plays at full speed.
             externalNativeBuild { cmake { arguments "-DCMAKE_BUILD_TYPE=Release" } }
         }
