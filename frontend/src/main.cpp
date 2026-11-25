@@ -62,6 +62,9 @@
 
 #include "game_builder.hpp"
 #include "embedded_toolchain.hpp"
+#ifdef _WIN32
+namespace st { std::string win_pick_rom(std::string& error); }  // win_pick.cpp
+#endif
 #endif
 #endif
 
@@ -986,6 +989,12 @@ void error_box(const std::string& text, SDL_Window* window = nullptr) {
 
 // The system's open-file dialog; "" when cancelled.
 fs::path pick_rom_file() {
+#ifdef _WIN32
+    std::string error;
+    const std::string picked = st::win_pick_rom(error);
+    if (!error.empty()) error_box(error);
+    return picked.empty() ? fs::path() : fs::u8path(picked);
+#endif
     struct Pick {
         std::atomic<int> done{0};
         std::string path;

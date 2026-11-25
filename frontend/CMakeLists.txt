@@ -115,7 +115,8 @@ target_link_libraries(SpiritTracks PRIVATE ntr_runtime ntr_common SDL3::SDL3-sta
 # TinyCC, LGPL), into the data folder. Its headers and config are packed into the program. ----
 if(WIN32)
   set(TCC_DIR ${CMAKE_SOURCE_DIR}/third_party/tinycc)
-  target_sources(SpiritTracks PRIVATE src/game_builder.cpp ${TCC_DIR}/libtcc.c)
+  target_sources(SpiritTracks PRIVATE src/game_builder.cpp src/win_pick.cpp ${TCC_DIR}/libtcc.c)
+  target_link_libraries(SpiritTracks PRIVATE comdlg32)
   set_source_files_properties(${TCC_DIR}/libtcc.c PROPERTIES COMPILE_OPTIONS "-w" COMPILE_DEFINITIONS "ONE_SOURCE=1")
   set_source_files_properties(src/game_builder.cpp PROPERTIES INCLUDE_DIRECTORIES "${TCC_DIR}")
   target_include_directories(SpiritTracks PRIVATE ${TCC_DIR}/config/windows)
