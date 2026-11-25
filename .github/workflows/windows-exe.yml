@@ -63,6 +63,10 @@ jobs:
           if [ -n "$ST_KEYSTORE_B64" ]; then
             echo "$ST_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/release.jks"
             args="$args -PstKeystore=$RUNNER_TEMP/release.jks"
+          elif [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            # Never publish a release with a throwaway key: it could not update, nor be updated.
+            echo "::error::No ST_KEYSTORE_B64 secret reached this job (Settings > Secrets and variables > Actions > Repository secrets)."
+            exit 1
           else
             echo "::warning::No ST_KEYSTORE_B64 secret: this APK is signed with a throwaway debug key and will not update over other builds."
           fi
