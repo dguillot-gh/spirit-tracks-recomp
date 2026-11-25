@@ -57,6 +57,9 @@ jobs:
         run: git clone --depth 1 -b release-3.4.18 https://github.com/libsdl-org/SDL.git "$RUNNER_TEMP/sdl3-src"
       - name: Build shell APK
         run: |
+          # SDL's Java side (SDLActivity etc.), copied in like scripts/5-BUILD-ANDROID.ps1 does
+          mkdir -p android/app/src/main/java/org/libsdl/app
+          cp "$RUNNER_TEMP"/sdl3-src/android-project/app/src/main/java/org/libsdl/app/*.java android/app/src/main/java/org/libsdl/app/
           chmod +x android/gradlew
           android/gradlew --no-daemon -p android :app:assembleDebug -PstShell -PstCmakeVersion=3.31.6 \
             "-PstSdlSource=$RUNNER_TEMP/sdl3-src"
