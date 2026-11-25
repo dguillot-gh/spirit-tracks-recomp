@@ -27,16 +27,26 @@ jobs:
         run: |
           # The version the exe shows: the tag without its v (v0.2.1 -> 0.2.1), as the APK; else the project's.
           ver=""; [[ "$GITHUB_REF" == refs/tags/v* ]] && ver="-DST_VERSION=${GITHUB_REF_NAME#v}"
+          # -static: bake libc++ and libunwind into the exe so players don't need libc++.dll / libunwind.dll.
           cmake -S . -B build/ci -G Ninja -DCMAKE_BUILD_TYPE=Release $ver \
             -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_RC_COMPILER=windres \
-            "-DCMAKE_CXX_FLAGS=-include algorithm" -DFFCC_BUILD_TESTS=OFF
+            "-DCMAKE_CXX_FLAGS=-include algorithm" \
+            "-DCMAKE_EXE_LINKER_FLAGS=-static" \
+            -DFFCC_BUILD_TESTS=OFF
       - name: Build
         run: cmake --build build/ci --target SpiritTracks -j 4
       - name: Package
         run: |
           mkdir -p out/SpiritTracks
           cp build/ci/frontend/SpiritTracks.exe LICENSE NOTICE.md out/SpiritTracks/
-          llvm-objdump -p out/SpiritTracks/SpiritTracks.exe | grep "DLL Name" | sort -u
+          # List the DLLs the exe imports, and fail if any compiler runtime DLL is still among them
+          # (players' PCs don't have llvm-mingw, so the exe would not start for them).
+          imports=$(llvm-objdump -p out/SpiritTracks/SpiritTracks.exe | grep "DLL Name" | sort -u || true)
+          echo "$imports"
+          if echo "$imports" | grep -Eiq 'libc\+\+|libunwind|libgcc|libwinpthread'; then
+            echo "::error::SpiritTracks.exe still dynamically imports compiler runtime DLLs"
+            exit 1
+          fi
       - uses: actions/upload-artifact@v4
         with:
           name: SpiritTracks-windows
