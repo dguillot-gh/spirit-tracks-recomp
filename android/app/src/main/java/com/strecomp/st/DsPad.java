@@ -96,7 +96,7 @@ public final class DsPad extends View {
     private boolean micOn, micSampleOn, lidClosed, topShown, bothShown, hiddenForController;
     private StMenu menu;  // the ≡ button's panel (GameActivity sets it)
     private boolean stickMode;   // the D-pad is an analog stick
-    private int wideMode;        // 0: normal 4:3; 1: 16:9; 2: 21:9
+    private int wideMode;        // 0: normal 4:3; 1: 16:9; 2: 21:9; 3: 16:10
     private int stickPointer = -1;
     private float knobX, knobY;  // the stick's position, -1..1 (y down)
 
@@ -146,7 +146,7 @@ public final class DsPad extends View {
 
     /** Widescreen: widen the game view and adjust the touch mapping. */
     void setWide(int mode) {
-        wideMode = Math.max(0, Math.min(2, mode));
+        wideMode = Math.max(0, Math.min(3, mode));
         invalidate();
     }
 
@@ -267,7 +267,7 @@ public final class DsPad extends View {
     // The picture, as frontend/src/layout.hpp places it: its width (landscape) or bottom edge (portrait: at the top, a
     // small margin, one or two DS screens the width of the phone).
     private float pictureWidth() {
-        final float content = bothShown ? 384f : 192f, across = wideMode == 2 ? 448f : wideMode == 1 ? 342f : 256f;
+        final float content = bothShown ? 384f : 192f, across = wideMode == 2 ? 448f : wideMode == 1 ? 342f : wideMode == 3 ? 308f : 256f;
         return across * Math.min(getWidth() / across, getHeight() / content);
     }
 

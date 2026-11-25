@@ -28,7 +28,7 @@ extern std::atomic<int> textures;          // the 3D textures asked for (0 pixel
 extern std::atomic<int> compute;           // the compute renderer asked for (1) or the OpenGL one (0); -1: no change
 extern std::atomic<bool> compute_failed;   // the compute renderer cannot run on this phone (the OpenGL one does)
 extern std::atomic<int> fixes;             // the 3D fixes asked for (bits: 1 fewer seams, 2 stable textures); -1: no change
-extern std::atomic<int> wide_mode;         // widescreen asked for (0 off, 1 16:9, 2 21:9); -1: no change
+extern std::atomic<int> wide_mode;         // widescreen asked for (0 off, 1 16:9, 2 21:9, 3 16:10); -1: no change
 extern std::atomic<int> hd_text;           // HD vector dialogue text (0 off, 1 on); -1: no change
 // The minimap (Android, landscape): the screen not shown, drawn small in this rectangle of the window (pixels; w 0: off).
 // DsPad.java places it (the bottom-left corner by default) and swaps the screens when it is tapped.

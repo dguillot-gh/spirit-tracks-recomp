@@ -17,7 +17,8 @@ software renderer (1x, in the menu) is the safe fallback.
   D-pad controls work; the QoL changes do not (they are in the QoL ROM's ARM7). A save state made with one ROM does not
   load with another (the in-game save does).
 - **Analog stick:** full push runs as far as the D-pad in the same time, a light push walks, Y walks slowly.
-- **Widescreen:** 16:9 and 21:9 fill the screen after Continue and after switching modes; 4:3 is back to normal after.
+- **Widescreen:** cutscenes fill the wide picture (letterbox bars only above and below).
+- **Widescreen:** 16:10, 16:9 and 21:9 fill the screen after Continue and after switching modes; 4:3 is back to normal after.
   The HUD stays at the edges under dialogue boxes, the horn cord stays at the edge pulled or not, the Menu bar opens at
   the right edge with its button.
 - **HD text:** file select, dialogue pages, choices, place-name cards; the text comes back after Continue (saved beside

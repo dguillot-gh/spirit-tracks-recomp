@@ -103,7 +103,7 @@ extern "C" JNIEXPORT void JNICALL Java_com_strecomp_st_StInput_nativeSetTextures
 }
 
 extern "C" JNIEXPORT void JNICALL Java_com_strecomp_st_StInput_nativeSetWide(JNIEnv*, jclass, jint mode) {
-    st::pad::wide_mode.store(std::clamp(int(mode), 0, 2));
+    st::pad::wide_mode.store(std::clamp(int(mode), 0, 3));
 }
 
 extern "C" JNIEXPORT void JNICALL Java_com_strecomp_st_StInput_nativeSetStickMode(JNIEnv*, jclass, jboolean on) {

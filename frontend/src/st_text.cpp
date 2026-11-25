@@ -50,6 +50,13 @@ struct PendingEntry {
     HdGlyph glyph;
     uint8_t pal_idx = 15;
     uint8_t solid_color_idx = 3;
+    uint8_t prio = 0;  // the text object's OBJ priority (attr2 bits 10..11)
+};
+
+// A text object drawn this frame: its box and OBJ priority (st_text_oam_flush: text under a panel).
+struct DrawnText {
+    float x0, y0, x1, y1;
+    uint8_t prio;
 };
 
 std::atomic<bool> g_enabled{false};
@@ -57,6 +64,7 @@ std::mutex g_mutex;
 std::unordered_map<uint32_t, ObjCanvas> g_canvases;
 std::vector<PendingEntry> g_pending[2];  // indexed by 2D engine (0 = A, 1 = B)
 std::vector<HdGlyph> g_visible[2];       // indexed by screen layer (0 = top, 1 = bottom)
+std::vector<DrawnText> g_drawn_pending[2];  // every text object drawn this frame, by 2D engine
 std::vector<TextBox> g_box_pending[2];   // the text boxes drawn this frame, by 2D engine
 std::vector<TextBox> g_box_visible[2];   // ... as shown, by screen layer
 
@@ -401,6 +409,7 @@ extern "C" void st_text_obj_draw(NtrCpu* c) {
     const int engine = ntr_rd16(c, obj + st::kTextEngine) != 0 ? 1 : 0;
     // The 4-bit OBJ palette from OBJ 0's attr2 (bits 12..15).
     const uint8_t pal_idx = static_cast<uint8_t>((ntr_rd16(c, obj + st::kTextObjAttr2) >> 12) & 0xFu);
+    const uint8_t prio = static_cast<uint8_t>((ntr_rd16(c, obj + st::kTextObjAttr2) >> 10) & 3u);
     {
         // A text object made before a save state was loaded (Continue) was never seen by st_text_obj_init: track its
         // canvas from here, so its next page of text (after the game clears it) is drawn in HD.
@@ -409,6 +418,8 @@ extern "C" void st_text_obj_draw(NtrCpu* c) {
         // Where the box is, for the minimap (with HD text off too).
         if (box_w > 0 && box_h > 0 && box_w <= 512 && box_h <= 384)
             st::g_box_pending[engine].push_back({float(screen_x), float(screen_y), float(screen_x + box_w), float(screen_y + box_h)});
+        if (box_w > 0 && box_h > 0 && box_w <= 512 && box_h <= 384)
+            st::g_drawn_pending[engine].push_back({float(screen_x), float(screen_y), float(screen_x + box_w), float(screen_y + box_h), prio});
     }
 
     std::lock_guard<std::mutex> lock(st::g_mutex);
@@ -431,6 +442,7 @@ extern "C" void st_text_obj_draw(NtrCpu* c) {
         e.glyph.box_x1 = float(screen_x + std::clamp(box_w, 0, 512));
         e.glyph.box_y1 = float(screen_y + std::clamp(box_h, 0, 384));
         e.pal_idx = pal_idx;
+        e.prio = prio;
         // 2bpp NFTR: v=1..3 maps to palette cl + v - 1; solid fill (v=3) is (cl + 2) & 0xF.
         e.solid_color_idx = static_cast<uint8_t>((g.bpp >= 2 ? (g.color_idx + 2u) : g.color_idx) & 0xFu);
         dst.push_back(e);
@@ -467,7 +479,25 @@ extern "C" void st_text_oam_flush(NtrCpu* c) {
 
     if (obj_on && !pending.empty() && !(bright_mode != 0 && bright_factor >= 16)) {
         visible.reserve(pending.size());
+        // Text under a panel: on the DS a background layer drawn between two text objects hides the one behind where
+        // they overlap (the collection's letter, its paper a background in front of the letter list's titles). The HD
+        // text is drawn over everything, so such text is left out: a glyph of a text object, with another text object
+        // of a lower OBJ priority over it and an enabled background whose priority lies between the two.
+        const uint32_t bg01 = ntr_rd32(c, engine == 0 ? 0x04000008u : 0x04001008u);
+        const uint32_t bg23 = ntr_rd32(c, engine == 0 ? 0x0400000Cu : 0x0400100Cu);
+        const uint8_t bg_prio[4] = {uint8_t(bg01 & 3u), uint8_t((bg01 >> 16) & 3u), uint8_t(bg23 & 3u), uint8_t((bg23 >> 16) & 3u)};
+        const auto covered = [&](const st::PendingEntry& e) {
+            const float gx0 = e.glyph.ds_x, gy0 = e.glyph.ds_y;
+            const float gx1 = gx0 + std::max(1.0f, e.glyph.slot_w), gy1 = gy0 + std::max(1.0f, e.glyph.cell_h);
+            for (const st::DrawnText& d : st::g_drawn_pending[engine]) {
+                if (d.prio >= e.prio || gx1 <= d.x0 || gx0 >= d.x1 || gy1 <= d.y0 || gy0 >= d.y1) continue;
+                for (int k = 0; k < 4; k++)
+                    if ((dispcnt & (1u << (8 + k))) && bg_prio[k] >= d.prio && bg_prio[k] < e.prio) return true;
+            }
+            return false;
+        };
         for (const st::PendingEntry& e : pending) {
+            if (covered(e)) continue;
             st::HdGlyph g = e.glyph;
             const uint32_t addr = pal_ram + uint32_t(e.pal_idx) * 32u + uint32_t(e.solid_color_idx) * 2u;
             const uint16_t c15 = ntr_rd16(c, addr);
@@ -476,4 +506,5 @@ extern "C" void st_text_oam_flush(NtrCpu* c) {
         }
     }
     pending.clear();
+    st::g_drawn_pending[engine].clear();
 }

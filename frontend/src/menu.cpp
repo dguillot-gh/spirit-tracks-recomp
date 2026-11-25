@@ -17,6 +17,7 @@ enum RowId { kScreen, kRenderer, kResolution, kTextures, kFixes, kPicture, kHdTe
              kContinue, kQuit,
              kRowCount };
 constexpr int kScales[] = {2, 4, 6, 8};
+constexpr int kWideModes[] = {0, 3, 1, 2};  // the Widescreen row: 4:3 (off), 16:10, 16:9, 21:9
 constexpr int kUsaLanguages[] = {-1, 1, 2, 5};        // Auto (system locale), English, French, Spanish (BKIE)
 constexpr int kEurLanguages[] = {-1, 1, 2, 3, 4, 5};  // ...and German, Italian (BKIP)
 constexpr int kColumns = 4;  // of the save state slots
@@ -56,7 +57,12 @@ Menu::Geometry Menu::geometry(const MenuState& s, float win_w, float win_h, floa
     r[kPicture] = {"Picture", {"Sharp", "Smooth"}, s.smooth ? 1 : 0, {true, true}, {}, {}};
     r[kHdText] = {"HD text", {"Off", "On"}, s.hd_text ? 1 : 0, {true, true}, {}, {}};
     r[kSize] = {"Picture size", {"Fit", "Stretch"}, s.stretch ? 1 : 0, {true, true}, {}, {}};
-    r[kWide] = {"Widescreen (test)", {"4:3", "16:9"}, s.wide && s.gpu ? 1 : 0, {true, s.gpu}, {}, {}};
+    {
+        int chosen = 0;
+        for (int i = 1; i < 4; i++)
+            if (s.wide && s.gpu && kWideModes[i] == s.wide_mode) chosen = i;
+        r[kWide] = {"Widescreen", {"4:3", "16:10", "16:9", "21:9"}, chosen, {true, s.gpu, s.gpu, s.gpu}, {}, {}};
+    }
     r[kFps] = {"FPS counter", {"Off", "Top L", "Top R", "Bot L", "Bot R"}, s.fps ? s.fps_corner + 1 : 0,
                {true, true, true, true, true}, {}, {}};
     r[kFullscreen] = {"Fullscreen", {"Off", "On"}, s.fullscreen ? 1 : 0, {true, true}, {}, {}};
@@ -136,8 +142,9 @@ MenuResult Menu::choose(int row, int choice, MenuState& s) {
         case kHdText: s.hd_text = choice == 1; break;
         case kSize: s.stretch = choice == 1; break;
         case kWide:
-            if (choice == 1 && !s.gpu) return MenuResult::None;
-            s.wide = choice == 1;
+            if (choice != 0 && !s.gpu) return MenuResult::None;
+            s.wide = choice != 0;
+            if (s.wide) s.wide_mode = kWideModes[choice];
             break;
         case kFps:
             s.fps = choice != 0;

@@ -225,10 +225,13 @@ final class StMenu {
 
         section(list, "Controls");
         final boolean wideAvailable = prefs.getBoolean("gpu", true) && !StInput.nativeGpuFailed();
-        final int wideMode = prefs.getBoolean("wide", false) ? Math.max(1, Math.min(2, prefs.getInt("wide_mode", 1))) : 0;
-        list.addView(label("Widescreen", "With OpenGL or Compute, shows more of the world at the sides. Some objects may appear late at the edges."));
-        chips(list, new String[] {"4:3", "16:9", "21:9"}, wideMode, i -> {
-            final int mode = wideAvailable ? i : 0;
+        final int wideMode = prefs.getBoolean("wide", false) ? Math.max(1, Math.min(3, prefs.getInt("wide_mode", 1))) : 0;
+        final int[] wideModes = {0, 3, 1, 2};  // the chips: 4:3 (off), 16:10, 16:9, 21:9
+        int wideChosen = 0;
+        for (int i = 0; i < wideModes.length; i++) if (wideModes[i] == wideMode) wideChosen = i;
+        list.addView(label("Widescreen", "With OpenGL or Compute, shows more of the world at the sides."));
+        chips(list, new String[] {"4:3", "16:10", "16:9", "21:9"}, wideChosen, i -> {
+            final int mode = wideAvailable ? wideModes[i] : 0;
             if (mode == wideMode) return;
             prefs.edit().putBoolean("wide", mode != 0).putInt("wide_mode", mode == 0 ? 1 : mode).apply();
             if (wideAvailable) {  // a new width makes a new GPU renderer: same as a renderer change (above)
@@ -239,7 +242,7 @@ final class StMenu {
             StInput.nativeSetWide(mode);
             pad.setWide(mode);
             refresh();
-        }, new boolean[] {true, wideAvailable, wideAvailable});
+        }, new boolean[] {true, wideAvailable, wideAvailable, wideAvailable});
         toggle(list, "Analog stick", "In place of the D-pad, like the 3DS's circle pad: Link walks the way you push it, "
                 + "running at the rim. A controller's left stick does the same.", pad.stickMode(), pad::setStickMode);
         row(list, "Move and resize controls", () -> {

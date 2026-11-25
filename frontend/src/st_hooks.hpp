@@ -13,6 +13,7 @@ struct Addresses {
     uint32_t oam_mgr_a, oam_mgr_b;          // the two OAM managers func_02009b18 is called with (st_text.cpp)
     uint32_t input_ptr;                     // the game's input (st_stick.cpp; the D-pad patch, USA only)
     uint32_t camera_yaw;                    // UnkStruct_027e09bc_0C::func_ov000_02078698 (st_stick.cpp)
+    uint32_t camera_planes;                 // func_ov000_020764c0: the camera's view planes (st_camera_planes)
 };
 const Addresses& addresses();
 

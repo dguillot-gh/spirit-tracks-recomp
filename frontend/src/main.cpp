@@ -17,7 +17,7 @@
 //
 //   SpiritTracks.exe <rom.nds> [--save-file F] [--data-dir D] [--input-script S] [--exit-after-frames N]
 //                        [--fullscreen] [--unpaced] [--module M] [--read-only-save] [--renderer software|compute|opengl]
-//                        [--scale 2|4|6|8] [--continue] [--wide] [--wide21] [--textures pixels|smooth|sharp]
+//                        [--scale 2|4|6|8] [--continue] [--wide] [--wide21] [--wide1610] [--textures pixels|smooth|sharp]
 //                        [--fixes 0-3] [--hd-text] [--language auto|en|fr|de|it|es]
 #include <SDL3/SDL.h>
 #ifdef __ANDROID__
@@ -101,6 +101,7 @@ constexpr int kScales[] = {2, 4, 6, 8};
 constexpr int kSlots = 12;  // save state slots
 constexpr int kWideExtra = 43;  // widescreen (a test): 256 + 2 x 43 = 342 pixels across 192, about 16:9
 constexpr int kUltraWideExtra = 96;  // 256 + 2 x 96 = 448 pixels across 192, 21:9
+constexpr int kWide1610Extra = 26;  // 256 + 2 x 26 = 308 pixels across 192, 16:10 (Steam Deck, tablets)
 constexpr int kResumeSlot = 99;  // the state written at quit, for Continue (resume.*)
 constexpr uint64_t kResumeStaleFrames = 1800;  // a cartridge save after this much play makes the resume state old
 
@@ -224,7 +225,7 @@ struct Settings {
     bool stretch = false; // the picture stretched over the whole window (else the DS's shape, with bars)
     bool stick = false;   // the analog stick moves Link (a gamepad's left stick, the phone's on-screen stick)
     bool wide = false;    // widescreen, 16:9 (a test; GPU and Compute renderers)
-    int wide_mode = 1;    // 1: 16:9, 2: 21:9
+    int wide_mode = 1;    // 1: 16:9, 2: 21:9, 3: 16:10
     int textures = 0;     // the 3D's textures with the GPU renderer: 0 the DS's pixels, 1 smooth, 2 sharp
     int fixes = 0;        // 3D fixes, bits: 1 fewer seams (GPU renderer's better polygons), 2 stable textures (no warp)
     bool hd_text = false; // render OBJ dialogue text with an embedded vector TrueType font
@@ -250,7 +251,7 @@ Settings load_settings(const fs::path& p) {
         else if (k == "stretch") s.stretch = v == "1";
         else if (k == "stick") s.stick = v == "1";
         else if (k == "wide") s.wide = v == "1";
-        else if (k == "wide_mode") s.wide_mode = std::clamp(std::atoi(v.c_str()), 1, 2);
+        else if (k == "wide_mode") s.wide_mode = std::clamp(std::atoi(v.c_str()), 1, 3);
         else if (k == "textures") s.textures = std::clamp(std::atoi(v.c_str()), 0, 2);
         else if (k == "fixes") s.fixes = std::clamp(std::atoi(v.c_str()), 0, 3);
         else if (k == "hd_text") s.hd_text = v == "1";
@@ -293,7 +294,7 @@ ntr::VideoSettings video_for(const Settings& s) {
 #ifdef __ANDROID__
     if (s.compute) v.scale = std::min(v.scale, 4);  // (its tile memory at 6x: some 300 MB of a phone's graphics memory)
 #endif
-    v.wide_extra = s.gpu && s.wide ? (s.wide_mode == 2 ? kUltraWideExtra : kWideExtra) : 0;
+    v.wide_extra = !s.gpu || !s.wide ? 0 : s.wide_mode == 2 ? kUltraWideExtra : s.wide_mode == 3 ? kWide1610Extra : kWideExtra;
     v.hud_edges = v.wide_extra > 0;  // the HUD at the wide picture's edges (touches on it are mapped back: to_ds)
     v.hud_sides = v.hud_edges;       // (as Phantom Hourglass: a HUD piece moved out keeps its place under a dialogue box,
                                      // the bands' clusters go to their side, a bar sliding out stays with the Menu button)
@@ -753,9 +754,18 @@ private:
         }
         // The minimap: the screen not shown, small, where the phone's pad put it (st::pad::map_*), like a game's
         // corner map. The same picture as that screen would show, kept to its own shape inside the rectangle.
-        // (Hidden while the game shows no HUD for half a second: cutscenes. DsPad hides its frame too.)
-        st::pad::map_hidden.store(frame.hud_absent >= 30);
-        if (v.top_shown != v.bottom_shown && st::pad::map_w.load() > 0 && st::pad::map_h.load() > 0 && frame.hud_absent < 30) {
+        // (Hidden while the game shows no HUD for half a second: cutscenes. DsPad hides its frame too. But Spirit Tracks
+        // slides its Menu button away while Link moves, so while the player moves him, by the stick, the D-pad or the
+        // touch screen, and for a second after, a missing HUD is not a cutscene: the minimap stayed hidden while running.)
+        // (A touch counts only when held a quarter second, as when the stylus walks Link: a tap that moves a cutscene's
+        // text on does not bring the minimap back.)
+        map_touch_frames_ = s_.touching.load() ? std::min(map_touch_frames_ + 1, 1000) : 0;
+        const bool moving = map_touch_frames_ >= 15 || std::abs(s_.stick_x.load()) > 150 || std::abs(s_.stick_y.load()) > 150 ||
+                            (s_.held.load() & (ntr::KeyUp | ntr::KeyDown | ntr::KeyLeft | ntr::KeyRight)) != 0;
+        map_input_quiet_ = moving ? 0 : std::min(map_input_quiet_ + 1, 1000);
+        const bool map_off = frame.hud_absent >= 30 && map_input_quiet_ >= 60;
+        st::pad::map_hidden.store(map_off);
+        if (v.top_shown != v.bottom_shown && st::pad::map_w.load() > 0 && st::pad::map_h.load() > 0 && !map_off) {
             const int layer = v.top_shown ? 1 : 0;
             const int layer_extra = layer == frame.wide_layer ? extra : 0;
             const float aspect = (256.0f + 2.0f * float(layer_extra)) / 192.0f;
@@ -843,6 +853,7 @@ private:
             ms.resume_time = resume_time_;
             ms.stick = view.stick;
             ms.wide = view.wide;
+            ms.wide_mode = view.wide_mode;
             ms.textures = view.textures;
             ms.fixes = view.fixes;
             ms.compute = view.compute;
@@ -903,6 +914,8 @@ private:
     uint64_t fps_since_ = 0, fps_frames_ = 0;  // (the FPS counter)
     std::chrono::steady_clock::time_point next_{};
     st::GlPresenter* gl_ = nullptr;  // (null: the phone's fallback, the main thread draws)
+    int map_input_quiet_ = 1000;  // frames since the player last moved Link (the minimap's cutscene check)
+    int map_touch_frames_ = 0;    // frames the touch screen has been held (the same check)
 #ifndef __ANDROID__
     int thumbs_version_ = -1;  // the slot pictures in gl_ (states_version)
     std::array<std::string, kSlots> times_{};
@@ -1044,7 +1057,7 @@ int main(int argc, char** argv) {
     // ---- arguments ----
     fs::path rom_path, save_path, data_dir, script_path, module_path = st::default_module_path();
     uint64_t exit_after = 0;
-    bool fullscreen_arg = false, unpaced = false, read_only_save = false, continue_arg = false, wide_arg = false, wide21_arg = false;
+    bool fullscreen_arg = false, unpaced = false, read_only_save = false, continue_arg = false, wide_arg = false, wide21_arg = false, wide1610_arg = false;
     bool fps_probe_arg = false, hd_text_arg = false;
     std::string renderer_arg, textures_arg;
     int scale_arg = 0, fixes_arg = -1, language_arg = -2;
@@ -1064,6 +1077,7 @@ int main(int argc, char** argv) {
         else if (a == "--continue") continue_arg = true;
         else if (a == "--wide") wide_arg = true;
         else if (a == "--wide21") wide_arg = wide21_arg = true;
+        else if (a == "--wide1610") wide_arg = wide1610_arg = true;
         else if (a == "--fps-probe") fps_probe_arg = true;
         else if (a == "--textures" && has) textures_arg = argv[++i];
         else if (a == "--fixes" && has) fixes_arg = std::atoi(argv[++i]);
@@ -1139,6 +1153,7 @@ int main(int argc, char** argv) {
     if (fullscreen_arg) settings.fullscreen = true;
     if (wide_arg) settings.wide = true;
     if (wide21_arg) settings.wide_mode = 2;
+    if (wide1610_arg) settings.wide_mode = 3;
     if (textures_arg == "pixels") settings.textures = 0;
     else if (textures_arg == "smooth") settings.textures = 1;
     else if (textures_arg == "sharp") settings.textures = 2;
@@ -1282,6 +1297,7 @@ int main(int argc, char** argv) {
         ms.resume_time = resume_time(shared.state_dir);
         ms.stick = settings.stick;
         ms.wide = settings.wide;
+        ms.wide_mode = settings.wide_mode;
         ms.textures = settings.textures;
         ms.fixes = settings.fixes;
         ms.compute = settings.compute;
@@ -1292,7 +1308,7 @@ int main(int argc, char** argv) {
     };
     auto menu_done = [&](const st::MenuState& ms, st::MenuResult r) {
         const bool video = ms.gpu != settings.gpu || ms.compute != settings.compute || ms.scale != settings.scale ||
-                           ms.wide != settings.wide ||
+                           ms.wide != settings.wide || (ms.wide && ms.wide_mode != settings.wide_mode) ||
                            ms.textures != settings.textures || ms.fixes != settings.fixes;
         const bool lang_changed = ms.language != settings.language;
         if (r == st::MenuResult::Quit) request_quit();
@@ -1301,6 +1317,7 @@ int main(int argc, char** argv) {
         settings.fps_corner = ms.fps_corner, settings.stretch = ms.stretch;
         settings.stick = ms.stick;
         settings.wide = ms.wide;
+        if (ms.wide) settings.wide_mode = ms.wide_mode;
         settings.textures = ms.textures;
         settings.fixes = ms.fixes;
         settings.compute = ms.compute;
@@ -1461,7 +1478,7 @@ int main(int argc, char** argv) {
         }
         if (const int want = st::pad::stretch.exchange(-1); want >= 0) settings.stretch = want != 0, changed = true;
         bool video = false;
-        if (const int want = st::pad::wide_mode.exchange(-1); want >= 0 && want <= 2) {
+        if (const int want = st::pad::wide_mode.exchange(-1); want >= 0 && want <= 3) {
             const bool on = want != 0;
             const int mode = on ? want : settings.wide_mode;
             if (settings.wide != on || (on && settings.wide_mode != mode))
