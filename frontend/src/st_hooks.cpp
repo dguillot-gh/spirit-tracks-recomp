@@ -24,42 +24,41 @@ constexpr Addresses kEur1 = {0x027E0198, 0x01FFBDC8, 0x0204AF1C, 0x0204C3AC, 0x0
 const Addresses* A = &kUsa;
 }  // namespace
 
-// Main 0x02022BCC: G3i_PerspectiveW_ (r0, r1 = sin and cos of half the field of view, r2 = the aspect ratio, 4.12).
-// The game always passes the DS's 4:3 (0x1555): widescreen gives the wide one instead, and tells the geometry engine
-// (third_party/CMakeLists.txt patch) that this scene is wide. A scene of orthographic geometry only (ffcc_wide_block)
-// stays 4:3.
+// Main 0x02022BCC: MTX_PerspectiveW (G3i_PerspectiveW_; r2 = the aspect ratio, 4.12, the DS's 4:3 0x1555), `before`.
+// It builds a projection into the game's memory (the camera's at + 0x88), which the game also uses to turn a touch into
+// a point in the world (drawing a path for Zelda, tapping things). So the game's copy stays 4:3, and the widened one
+// goes to the geometry engine only (st_load_mtx44, below): a wide copy here drew right but put touches up to 1.75 times
+// too far out to the sides at 21:9.
 extern "C" int ffcc_wide_scene;
 extern "C" int ffcc_wide_block;
 namespace {
 std::atomic<uint32_t> g_aspect{0x1555};
 }
-extern "C" void st_perspective_aspect(NtrCpu* c) {
-    const uint32_t aspect = g_aspect.load(std::memory_order_relaxed);
-    if (c->r[2] == 0x1555 && aspect != 0x1555 && ffcc_wide_block == 0) {
-        c->r[2] = aspect;
-        ffcc_wide_scene = 8;
-    }
-}
+extern "C" void st_perspective_aspect(NtrCpu*) {}
 
-// Main 0x020249EC: G3_LoadMtx44 (r0 = the matrix), `before`. Unlike Phantom Hourglass, Spirit Tracks builds its camera's
-// projection (MTX_PerspectiveW, above) only when the field of view changes and then loads the stored matrix every
-// frame. So the hook above alone widened a scene for 8 frames only (ffcc_wide_scene counts down), never a scene
-// continued from a save state or a widescreen change (its matrix was built at 4:3), and never went back to 4:3. Here a
-// perspective matrix (_33 = 0, _23 < 0, nothing off the diagonal in the first two rows) whose aspect (_11 / _00) is one
-// of ours (4:3 to 21:9) gets the aspect chosen now, in the game's own copy (so it holds until the game rebuilds it),
-// and a wide one keeps the scene marked wide.
-extern "C" void st_load_mtx44(NtrCpu* c) {
+// Main 0x020249EC: G3_LoadMtx44 (r0 = the matrix), `instead`: the game's command 0x16 (MTX_LOAD_4x4) and the matrix's
+// 16 words, written to the geometry FIFO (0x04000400), as the function itself does. A perspective matrix (_33 = 0,
+// _23 < 0, nothing off the diagonal in the first two rows) whose aspect (_11 / _00) is one of ours (4:3 to 21:9) is sent
+// with the aspect chosen now instead, and its scene marked wide; the game's own copy is left at, or put back to, 4:3
+// (a save state from before kept a widened one). Spirit Tracks loads its camera's projection this way every frame and
+// builds it only when the field of view changes, so a widescreen change shows at once.
+extern "C" int st_load_mtx44(NtrCpu* c) {
     const uint32_t m = c->r[0];
-    if (ntr_rd32(c, m + 0x3C) != 0) return;                                  // _33: not a perspective projection
-    if (int32_t(ntr_rd32(c, m + 0x2C)) >= 0) return;                         // _23
+    if (ntr_rd32(c, m + 0x3C) != 0) return 0;                                // _33: not a perspective projection
+    if (int32_t(ntr_rd32(c, m + 0x2C)) >= 0) return 0;                       // _23
     const int32_t m00 = int32_t(ntr_rd32(c, m + 0x00)), m11 = int32_t(ntr_rd32(c, m + 0x14));
-    if (m00 <= 0 || m11 <= 0) return;
-    if (ntr_rd32(c, m + 0x04) | ntr_rd32(c, m + 0x08) | ntr_rd32(c, m + 0x10) | ntr_rd32(c, m + 0x18)) return;
+    if (m00 <= 0 || m11 <= 0) return 0;
+    if (ntr_rd32(c, m + 0x04) | ntr_rd32(c, m + 0x08) | ntr_rd32(c, m + 0x10) | ntr_rd32(c, m + 0x18)) return 0;
     const int64_t now = int64_t(m11) * 4096 / m00;                           // the matrix's aspect, 4.12
-    if (now < 0x1500 || now > 0x2800) return;                                // (not one of ours: leave it)
+    if (now < 0x1500 || now > 0x2800) return 0;                              // (not one of ours: leave it)
+    if (std::llabs(now - 0x1555) > 8) ntr_wr32(c, m + 0x00, uint32_t(int64_t(m11) * 4096 / 0x1555));  // the game's: 4:3
     const uint32_t want = ffcc_wide_block == 0 ? g_aspect.load(std::memory_order_relaxed) : 0x1555u;
-    if (std::llabs(now - int64_t(want)) > 8) ntr_wr32(c, m + 0x00, uint32_t(int64_t(m11) * 4096 / int64_t(want)));
-    if (want != 0x1555u) ffcc_wide_scene = 8;
+    if (want == 0x1555u) return 0;                                           // (4:3: the game's own load)
+    ntr_wr32(c, 0x04000400u, 0x16u);                                         // MTX_LOAD_4x4
+    for (uint32_t i = 0; i < 16; i++)
+        ntr_wr32(c, 0x04000400u, i == 0 ? uint32_t(int64_t(m11) * 4096 / int64_t(want)) : ntr_rd32(c, m + i * 4));
+    ffcc_wide_scene = 8;
+    return 1;
 }
 
 // Overlay 0 0x020764A0 (func_ov000_020764c0), `before`: the camera builds its view planes, which decide which actors
