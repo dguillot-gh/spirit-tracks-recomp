@@ -1,10 +1,11 @@
 # Builds SpiritTracks.exe the way a player downloads it: the program only (recompiler + TinyCC + its build files
 # inside), no ROM and no game. On first run it asks for the player's own ROM and builds the game itself.
 name: Windows exe + Android shell APK
+# Runs only when asked: the "Run workflow" button (Actions tab), or pushing a tag named build-* (git tag build-N; git push <remote> build-N).
 on:
-  push:
-    branches: [feature/pc-setup]
   workflow_dispatch:
+  push:
+    tags: ['build-*']
 jobs:
   windows:
     runs-on: windows-latest
