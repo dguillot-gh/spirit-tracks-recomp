@@ -16,7 +16,7 @@ main 0202708c replace ntr_nitro_init_context   # OS_InitContext (OS_func_0062)
 main 02022bcc before st_perspective_aspect      # MTX_PerspectiveW (G3i_PerspectiveW_)
 # ...but the camera builds that matrix only when its field of view changes, and loads it every frame: the aspect is
 # also set on the way into the geometry engine (st_hooks.cpp).
-main 020249ec before st_load_mtx44              # G3_LoadMtx44
+main 020249ec instead st_load_mtx44             # G3_LoadMtx44 (the wide projection: the geometry engine's only)
 # ...and the camera's view planes, which decide which actors are drawn, take in the wide picture (st_hooks.cpp).
 ov000 020764a0 before st_camera_planes           # func_ov000_020764c0: the camera's view planes
 
