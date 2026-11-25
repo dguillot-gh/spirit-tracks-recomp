@@ -112,7 +112,7 @@ endif()
 target_link_libraries(SpiritTracks PRIVATE ntr_runtime ntr_common SDL3::SDL3-static)
 
 # ---- first-run setup: the program builds st_game from the player's ROM itself (game_builder.cpp: the recompiler +
-# TinyCC, LGPL), into the data folder. Its headers and config go in toolchain/ next to the program. ----
+# TinyCC, LGPL), into the data folder. Its headers and config are packed into the program. ----
 if(WIN32)
   set(TCC_DIR ${CMAKE_SOURCE_DIR}/third_party/tinycc)
   target_sources(SpiritTracks PRIVATE src/game_builder.cpp ${TCC_DIR}/libtcc.c)
@@ -121,15 +121,19 @@ if(WIN32)
   target_include_directories(SpiritTracks PRIVATE ${TCC_DIR}/config/windows)
   target_link_libraries(SpiritTracks PRIVATE ntr_recomp)
   target_compile_definitions(SpiritTracks PRIVATE ST_PC_SETUP=1)
-  set(ST_TOOLCHAIN $<TARGET_FILE_DIR:SpiritTracks>/toolchain)
-  add_custom_command(TARGET SpiritTracks POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory ${TCC_DIR}/include ${ST_TOOLCHAIN}/tcc/include
-    COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_SOURCE_DIR}/tools/ondevice/stdint.h ${CMAKE_SOURCE_DIR}/tools/ondevice/string.h ${ST_TOOLCHAIN}/tcc/include
-    COMMAND ${CMAKE_COMMAND} -E copy_directory ${TCC_DIR}/win32/lib ${ST_TOOLCHAIN}/tcc/lib
-    COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_SOURCE_DIR}/tools/ondevice/dllstart.c ${ST_TOOLCHAIN}/tcc/lib
-    COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/runtime/include ${ST_TOOLCHAIN}/rt
-    COMMAND ${CMAKE_COMMAND} -E copy_directory ${ST_CONFIG} ${ST_TOOLCHAIN}/config
+  # The compiler's support files are packed into the exe (unpacked to the data folder only while building).
+  set(ST_TOOLCHAIN_CPP ${CMAKE_CURRENT_BINARY_DIR}/embedded_toolchain_data.cpp)
+  file(GLOB_RECURSE ST_TOOLCHAIN_INPUTS CONFIGURE_DEPENDS ${TCC_DIR}/include/* ${TCC_DIR}/win32/lib/*
+       ${CMAKE_SOURCE_DIR}/runtime/include/* ${ST_CONFIG}/*)
+  add_custom_command(OUTPUT ${ST_TOOLCHAIN_CPP}
+    COMMAND ${CMAKE_COMMAND} -DOUT=${ST_TOOLCHAIN_CPP} -DTCC=${TCC_DIR} -DONDEVICE=${CMAKE_SOURCE_DIR}/tools/ondevice
+            -DRT=${CMAKE_SOURCE_DIR}/runtime/include -DCFG=${ST_CONFIG} -P ${CMAKE_SOURCE_DIR}/tools/embed_toolchain.cmake
+    DEPENDS ${CMAKE_SOURCE_DIR}/tools/embed_toolchain.cmake ${ST_TOOLCHAIN_INPUTS}
+            ${CMAKE_SOURCE_DIR}/tools/ondevice/stdint.h ${CMAKE_SOURCE_DIR}/tools/ondevice/string.h
+            ${CMAKE_SOURCE_DIR}/tools/ondevice/dllstart.c
     VERBATIM)
+  target_sources(SpiritTracks PRIVATE src/embedded_toolchain.cpp ${ST_TOOLCHAIN_CPP})
+  set_source_files_properties(${ST_TOOLCHAIN_CPP} PROPERTIES INCLUDE_DIRECTORIES ${CMAKE_CURRENT_SOURCE_DIR}/src)
 endif()
 if(ST_GLES_SHADERS)  # (the gles-test preset: the phone's renderer, its ES shaders and gles_compat, on the PC)
   target_sources(SpiritTracks PRIVATE src/gles_compat.cpp)

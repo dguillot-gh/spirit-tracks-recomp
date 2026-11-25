@@ -61,6 +61,7 @@
 #include <thread>
 
 #include "game_builder.hpp"
+#include "embedded_toolchain.hpp"
 #endif
 #endif
 
@@ -1048,7 +1049,13 @@ bool first_run_setup(const fs::path& base, const fs::path& data_dir, fs::path& r
     std::string error;
     std::thread worker([&] {
         const auto u8 = [](const fs::path& p) { const auto s = p.u8string(); return std::string(s.begin(), s.end()); };
-        error = st::build_game(u8(rom_path), u8(base / "toolchain"), u8(module), u8(data_dir / "build-work"), progress);
+        // The compiler's files travel inside the exe: unpack them next to the work folder, remove them afterwards.
+        const fs::path tools = data_dir / "build-tools";
+        error = st::unpack_toolchain(u8(tools));
+        if (error.empty())
+            error = st::build_game(u8(rom_path), u8(tools), u8(module), u8(data_dir / "build-work"), progress);
+        std::error_code rm_ec;
+        fs::remove_all(tools, rm_ec);
         finished = true;
     });
     const uint64_t start = SDL_GetTicks();
