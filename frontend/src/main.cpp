@@ -63,7 +63,7 @@
 #include "game_builder.hpp"
 #include "embedded_toolchain.hpp"
 #ifdef _WIN32
-namespace st { std::string win_pick_rom(std::string& error); }  // win_pick.cpp
+namespace st { std::string win_pick_rom(std::string& error); std::string win_exe_path(); }  // win_pick.cpp
 #endif
 #endif
 #endif
@@ -1259,9 +1259,20 @@ int main(int argc, char** argv) {
         module_path = data_dir / "game" / "st_game.dll";
         if (rom_path.empty() && !fs::exists(base / "rom" / "bkie.nds", ec) && fs::exists(data_dir / "rom" / "bkie.nds", ec))
             rom_path = data_dir / "rom" / "bkie.nds";
-        if (setup_arg || !fs::exists(module_path, ec)) {
+        // The built game belongs to the exe that built it (its runtime, recompiler and hook lists): a new exe (an
+        // update) rebuilds it from the kept ROM, without asking. game/st_game.id holds the builder exe's SHA-1.
+        const fs::path id_path = data_dir / "game" / "st_game.id";
+        std::string exe_id;
+        if (const std::string exe = st::win_exe_path(); !exe.empty())
+            if (const std::vector<uint8_t> bytes = read_file(fs::u8path(exe)); !bytes.empty())
+                exe_id = ntr::to_hex(ntr::sha1(bytes));
+        std::string built_id;
+        if (std::ifstream f(id_path); f) std::getline(f, built_id);
+        const bool stale = !exe_id.empty() && built_id != exe_id;
+        if (setup_arg || stale || !fs::exists(module_path, ec)) {
             if (rom_path.empty() && fs::exists(base / "rom" / "bkie.nds", ec)) rom_path = base / "rom" / "bkie.nds";
             if (!first_run_setup(base, data_dir, rom_path, module_path)) return 0;
+            if (!exe_id.empty()) std::ofstream(id_path) << exe_id << '\n';
         }
     }
 #endif

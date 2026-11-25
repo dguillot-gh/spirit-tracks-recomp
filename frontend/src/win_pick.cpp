@@ -31,5 +31,16 @@ std::string win_pick_rom(std::string& error) {
     return out;
 }
 
+// UTF-8 path of the running exe.
+std::string win_exe_path() {
+    wchar_t buf[4096];
+    const DWORD n = GetModuleFileNameW(nullptr, buf, DWORD(sizeof(buf) / sizeof(buf[0])));
+    if (n == 0 || n >= sizeof(buf) / sizeof(buf[0])) return "";
+    const int m = WideCharToMultiByte(CP_UTF8, 0, buf, int(n), nullptr, 0, nullptr, nullptr);
+    std::string out(m > 0 ? m : 0, '\0');
+    if (m > 0) WideCharToMultiByte(CP_UTF8, 0, buf, int(n), out.data(), m, nullptr, nullptr);
+    return out;
+}
+
 }  // namespace st
 #endif
