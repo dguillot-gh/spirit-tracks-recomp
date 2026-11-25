@@ -1,0 +1,40 @@
+# Builds SpiritTracks.exe the way a player downloads it: the program only (recompiler + TinyCC + its build files
+# inside), no ROM and no game. On first run it asks for the player's own ROM and builds the game itself.
+name: Windows exe
+on:
+  push:
+    branches: [feature/pc-setup]
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: llvm-mingw (UCRT, x86_64)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download -R mstorsjo/llvm-mingw -p '*-ucrt-x86_64.zip' -D "$RUNNER_TEMP"
+          7z x -y -o"$RUNNER_TEMP" "$RUNNER_TEMP"/llvm-mingw-*-ucrt-x86_64.zip > /dev/null
+          echo "$(cygpath -w "$(ls -d "$RUNNER_TEMP"/llvm-mingw-*-ucrt-x86_64 | head -1)")\\bin" >> "$GITHUB_PATH"
+      - name: Configure
+        run: |
+          cmake -S . -B build/ci -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_RC_COMPILER=windres \
+            "-DCMAKE_CXX_FLAGS=-include algorithm" -DFFCC_BUILD_TESTS=OFF
+      - name: Build
+        run: cmake --build build/ci --target SpiritTracks -j 4
+      - name: Package
+        run: |
+          mkdir -p out/SpiritTracks
+          cp build/ci/frontend/SpiritTracks.exe LICENSE NOTICE.md out/SpiritTracks/
+          llvm-objdump -p out/SpiritTracks/SpiritTracks.exe | grep "DLL Name" | sort -u
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SpiritTracks-windows
+          path: out/SpiritTracks
