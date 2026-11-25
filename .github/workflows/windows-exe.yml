@@ -25,7 +25,9 @@ jobs:
           echo "$(cygpath -w "$(ls -d "$RUNNER_TEMP"/llvm-mingw-*-ucrt-x86_64 | head -1)")\\bin" >> "$GITHUB_PATH"
       - name: Configure
         run: |
-          cmake -S . -B build/ci -G Ninja -DCMAKE_BUILD_TYPE=Release \
+          # The version the exe shows: the tag without its v (v0.2.1 -> 0.2.1), as the APK; else the project's.
+          ver=""; [[ "$GITHUB_REF" == refs/tags/v* ]] && ver="-DST_VERSION=${GITHUB_REF_NAME#v}"
+          cmake -S . -B build/ci -G Ninja -DCMAKE_BUILD_TYPE=Release $ver \
             -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_RC_COMPILER=windres \
             "-DCMAKE_CXX_FLAGS=-include algorithm" -DFFCC_BUILD_TESTS=OFF
       - name: Build

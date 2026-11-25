@@ -25,7 +25,10 @@ if(NOT ST_GIT_COMMIT)
 elseif(ST_GIT_DIRTY)
   string(APPEND ST_GIT_COMMIT "-dirty")
 endif()
-set(ST_BUILD_LABEL "v${PROJECT_VERSION} (${ST_GIT_COMMIT})")
+# CI passes -DST_VERSION from the release tag (v0.2.1 -> 0.2.1), so the exe says what the Release says; local builds
+# show the project's version.
+set(ST_VERSION "${PROJECT_VERSION}" CACHE STRING "Version the program shows (CI: the release tag)")
+set(ST_BUILD_LABEL "v${ST_VERSION} (${ST_GIT_COMMIT})")
 if(EXISTS ${CMAKE_SOURCE_DIR}/.git)
   set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/.git)
 endif()
