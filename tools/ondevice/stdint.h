@@ -2,8 +2,13 @@
 typedef signed char int8_t; typedef unsigned char uint8_t;
 typedef short int16_t; typedef unsigned short uint16_t;
 typedef int int32_t; typedef unsigned int uint32_t;
+#ifdef _WIN32  /* LLP64: long is 32-bit; must match TinyCC's own intptr_t (__PTRDIFF_TYPE__) */
 typedef long long int64_t; typedef unsigned long long uint64_t;
 typedef long long intptr_t; typedef unsigned long long uintptr_t;
+#else  /* LP64 (Android arm64): long is 64-bit */
+typedef long int64_t; typedef unsigned long uint64_t;
+typedef long intptr_t; typedef unsigned long uintptr_t;
+#endif
 typedef long long intmax_t; typedef unsigned long long uintmax_t;
 #define INT32_MAX 2147483647
 #define INT32_MIN (-INT32_MAX-1)
