@@ -43,7 +43,8 @@ Menu::Geometry Menu::geometry(const MenuState& s, float win_w, float win_h, floa
     std::vector<Row>& r = g.rows;
     r.resize(kRowCount);
     r[kScreen] = {"Screen", {"Touch", "Top", "Both"}, int(s.layout), {true, true, true}, {}, {}};
-    r[kRenderer] = {"Renderer", {"Software", "Compute"}, s.gpu ? 1 : 0, {true, !s.gpu_failed}, {}, {}};
+    r[kRenderer] = {"Renderer", {"Software", "Compute", "OpenGL"}, !s.gpu ? 0 : s.compute ? 1 : 2,
+                    {true, !s.gpu_failed, true}, {}, {}};
     {
         int chosen = 0;
         for (int i = 0; i < 4; i++)
@@ -123,8 +124,8 @@ MenuResult Menu::choose(int row, int choice, MenuState& s) {
         case kScreen: s.layout = Layout(choice); break;
         case kRenderer:
             if (choice == 1 && s.gpu_failed) return MenuResult::None;
-            s.gpu = choice == 1;
-            s.compute = true;  // (the OpenGL renderer only with --renderer opengl, or when Compute cannot run)
+            s.gpu = choice != 0;
+            s.compute = choice != 2;  // OpenGL: melonDS's classic GPU renderer (lighter on weak or integrated GPUs)
             break;
         case kResolution:
             if (!s.gpu || choice == 0) return MenuResult::None;  // (1x is the software renderer's)
