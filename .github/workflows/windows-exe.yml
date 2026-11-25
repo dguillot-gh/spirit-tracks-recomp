@@ -96,4 +96,8 @@ jobs:
             echo
             echo "Built from commit ${GITHUB_SHA::7}."
           } > notes.md
-          gh release create "$GITHUB_REF_NAME" out/* -R "$GITHUB_REPOSITORY" --title "Spirit Tracks Recomp $GITHUB_REF_NAME" --notes-file notes.md $([[ "$GITHUB_REF_NAME" == *-* ]] && echo --prerelease)
+          # Safe to run again (a re-run, or an upload retried after it had gone through): create once, then overwrite.
+          pre=""; [[ "$GITHUB_REF_NAME" == *-* ]] && pre="--prerelease"
+          gh release view "$GITHUB_REF_NAME" -R "$GITHUB_REPOSITORY" > /dev/null 2>&1 ||
+            gh release create "$GITHUB_REF_NAME" -R "$GITHUB_REPOSITORY" --title "Spirit Tracks Recomp $GITHUB_REF_NAME" --notes-file notes.md $pre
+          gh release upload "$GITHUB_REF_NAME" out/* -R "$GITHUB_REPOSITORY" --clobber
