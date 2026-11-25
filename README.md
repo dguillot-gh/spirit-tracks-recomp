@@ -36,16 +36,18 @@ program and Android app, set up for Spirit Tracks.
 - Sharp or smooth filtering; the DS's shape or stretched
 
 **Play**
+- D-pad controls and an analog stick (on-screen or a gamepad's left stick: walk with a light push, run at the rim),
+  **with no ROM patch needed**: the port does what d0k3's D-pad patch does in the game's code itself, so a build from
+  your clean dump has them too
 - Your clean USA dump, the D-pad patch or the D-pad + QoL patch: one build plays all three (built from the D-pad + QoL
-  ROM by default, so the D-pad controls work with the clean dump too; the QoL changes come with the QoL ROM)
-- D-pad movement and an analog stick (on-screen or a gamepad's left stick): walk with a light push, run at the rim
+  ROM by default; the QoL changes come only with the QoL ROM)
 - 12 save-state slots with pictures, plus Continue from where you quit
 - Language: Auto (the system's), English, French or Spanish, the three the USA ROM carries, plus German and Italian
   with a European ROM; in the PC menu, the phone's settings, `settings.ini` or `--language` (applies at the next start
   from the title screen, not Continue) (from Phantom Hourglass Recomp, by chouette-cc)
 - **Europe (test):** a European dump (Revision 0 or 1) builds with `-Variant eur`. Its addresses come from the
-  zeldaret/st decomp, not yet tried on a real European ROM: reports welcome. Touch controls only (the D-pad patch is
-  USA only).
+  zeldaret/st decomp, not yet tried on a real European ROM: reports welcome. The D-pad controls and the analog
+  stick are mapped for it too (untested).
 - Touch, keyboard and gamepad; microphone and Spirit Flute blow buttons (no real microphone needed)
 
 **Phone**
@@ -63,9 +65,9 @@ Ideas and features being considered next: [docs/WISHLIST.md](docs/WISHLIST.md).
 
 - Your own dump: *Legend of Zelda, The - Spirit Tracks (USA, Australia) (En,Fr,Es)*, SHA-1
   `1f0921b5e99db9d92d24710f1b004e4f3c997b73` (found by its SHA-1, whatever its name). USA Rev 1 is not supported.
-- For the D-pad controls and the analog stick: d0k3's *DPAD & QoL Hack v0.9c* (the folder `loz_st_dpad_qol-v0.9c` with
-  its BPS files). The scripts patch your dump with it. Without it you can still build the retail game
-  (`-Variant clean`): touch controls only, no D-pad movement or analog stick.
+- Optional: d0k3's *DPAD & QoL Hack v0.9c* (the folder `loz_st_dpad_qol-v0.9c` with its BPS files), for its QoL
+  changes (L / R blow the Spirit Flute and speed up the train, and more). The D-pad controls and the analog stick no
+  longer need it: a build from your clean dump (`-Variant clean`) has them.
 
   | ROM | SHA-1 |
   |---|---|
@@ -95,8 +97,8 @@ waiting. Step by step:
    Close PowerShell and open it again afterwards.
 2. **Make a folder for everything**, for example `C:\Games\st-workspace`, and inside it a folder named `roms`. Put
    your Spirit Tracks dump (USA) in `roms` (any file name).
-3. **For the D-pad controls and the analog stick** (recommended): put d0k3's patch folder `loz_st_dpad_qol-v0.9c` in
-   `roms\patches\`. Without it you get the original game, touch controls only.
+3. **Optional, for the QoL patch's extras:** put d0k3's patch folder `loz_st_dpad_qol-v0.9c` in `roms\patches\`.
+   Without it, build with `-Variant clean`: the D-pad controls and the analog stick work all the same.
 4. **Download the project** into that folder. In PowerShell, paste these two lines (change the path if you used another
    folder):
    ```powershell
@@ -168,8 +170,11 @@ Gamepads work too (the menu can make the left stick an analog stick).
 minimap), MIC, BLOW and LID. The menu has the renderer, widescreen, HD text, save states, the analog stick and
 "Move and resize controls".
 
-With the D-pad patches the D-pad moves Link, Y + D-pad walks, B slashes, A talks and rolls; with the QoL patch L or R
-also blow the Spirit Flute and speed up the train (the patch's own readme has the full list).
+The D-pad (or the stick) moves Link, Y + D-pad walks, B slashes (with a direction: the other slash), A talks, picks up
+and taps in front of Link, A with a direction rolls. The field's own D-pad shortcuts move to Select + Right, Select +
+Down and Select + Up. These work on every ROM (native since 2026-11-25; on the patched ROMs the patch's own code does
+it). With the QoL patch L or R also blow the Spirit Flute and speed up the train (the patch's own readme has the full
+list).
 
 ## Testing and reporting issues
 

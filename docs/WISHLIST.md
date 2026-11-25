@@ -23,11 +23,10 @@ status or caution note; nothing here is promised.
 
 ## 2. Gameplay, controls and accessibility
 
-- **Native analog movement and camera, no ROM patch.** Clean dumps rely on the stylus unless the D-pad patch is applied
-  (and there is none for Europe). Driving Link's movement and the camera's yaw / pitch directly from hooks (the
-  decompilations name the functions) would give 360-degree analog movement and right-stick camera control on clean
-  dumps of every region. *Note: Phantom Hourglass's stick (`ph_stick.cpp`) already works through the game's touch
-  control; Spirit Tracks's goes through the D-pad patch's routine.*
+- **Right-stick camera control.** *(Native analog movement is done, 2026-11-25: `st_pad.cpp` does the D-pad patch's
+  work by hooks, so clean dumps of every release have the D-pad and the stick.)* Driving the camera's yaw / pitch from
+  hooks (the decompilations name the functions) would add right-stick camera control. Still to do: USA Rev 1 is not
+  supported at all yet (nearly all of its code moved), and the QoL patch's ARM7 changes are not native.
 - **Spirit Flute accessibility and auto-play (Spirit Tracks, issue #4).** The flute lessons and duets are hard with touch
   and a blow button, and a barrier for players who are deaf or hard of hearing:
   - visual pitch and timing cues: an on-screen rhythm bar or highlighted pipes showing each note and its length;

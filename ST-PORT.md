@@ -11,7 +11,7 @@ for Spirit Tracks's. Build on the home PC with `scripts\RUN-ALL.ps1` (see `scrip
 |---|---|
 | Game code / config | BKIE (USA), `frontend/config/bkie/` |
 | `functions.txt` | 32,522 functions from zeldaret/st (`config/usa/arm9`, commit 1f284ce) by `tools/import_dsd.py`: main 2,153, ITCM 227, 114 overlays (ov097 and ov100 have none); 42 DS Protect functions flagged `!dsprot` |
-| `hooks.txt` | OS_Save/Load/InitContext, OS_IrqHandler (below), the six DSProt_* wrappers, and the D-pad patch's movement (0x02044B28) for the analog stick |
+| `hooks.txt` | OS_Save/Load/InitContext, OS_IrqHandler (below), the six DSProt_* wrappers, the D-pad patch's movement (0x02044B28) for the analog stick, and the native D-pad controls (below) |
 | `st_hooks.cpp` | OS_IRQTable / ThreadSwitch addresses; `st_dsprot_detect` (r0 = 0) and `st_dsprot_detect_not` (calls the callback, r0 = 1) |
 | ROMs | clean USA, the D-pad patch (`6a63d887…`) and the D-pad + QoL patch (`6896c1db…`) by SHA-1 (`common/src/known_roms.cpp`); one build plays all three (below) |
 | Engine | `NTR_ABI_VERSION` 2: `NtrGameInfo.rom_sha1`, the SHA-1 of the ROM the module was recompiled from; the program takes any listed BKIE ROM with any listed module (below) |
@@ -81,8 +81,24 @@ zeldaret/st has no PlayerControl (Phantom Hourglass's stick reads Link's touch s
 is only on its stack, but with no stylus down it ends in the D-pad patch's 0x02044B28, which writes mUnk_3C (the
 stylus's distance from Link, fx32 pixels: 0x60000 = 96 Y-walk, 0x5F0000 = 1520 run) and mUnk_44/46 (camera yaw from
 0x02078678 with r0 = r8, plus 0 down, 0x4000 right, 0x8000 up, 0xC000 left: its table at 0x02044BA4), and clears
-mUnk_40/5C. `st_stick_move` (hooks.txt, `instead`) writes the same from the stick, so the stick needs a module built
-from a patched ROM; on a clean-built module it does nothing.
+mUnk_40/5C. `st_stick_move` (hooks.txt, `instead`) writes the same from the stick.
+
+## The D-pad controls, native (2026-11-25)
+
+The D-pad patch's ARM9 part changes 10 places in the clean code (found by diffing the dsd-extracted clean and D-pad
+ROMs): 7 calls or instructions in overlays 0, 17, 24, 93 and 102 now branch into its 12 routines. `frontend/src/st_pad.cpp`
+does each routine's work by a hook at the same place, so a module built from the clean dump (or a European one) has the
+controls: movement (Link's stop call, `st_pad_move`, which also takes the stick), B slashes (`st_pad_action`), A taps
+in front of Link (`st_pad_a_tap`), A + direction rolls (`st_pad_roll`), A held as a held stylus (`st_pad_a_hold`), B + Y
+(`st_pad_by`), and AdventureModeManager's Right / Down / Select moved to Select + Right / Down / Up and overlay 93's
+A / Left to Select + Left (`st_pad_keys_*`).
+
+Two recompiler features made that possible: an `at` hook (a C function called just before one instruction, in every
+function that holds it) and an expected instruction word after any hook (`=e3100010`): where the code differs (a module
+built from a patched ROM) the hook is left out with a warning in the report, so the patch's own code runs. The three
+call-site hooks also check the return address (lr), which in a patched module is the patch's.
+Checked on a Pixel 8 (2026-11-25, clean USA build): the D-pad and the stick move, and A / B / rolls work; the QoL build
+leaves the 7 patched-site hooks out. The European addresses are mapped by the decomp's function names, untested.
 
 ## Widescreen (fixed 2026-11-22)
 

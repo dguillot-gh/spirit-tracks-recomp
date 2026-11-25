@@ -9,8 +9,8 @@
 // up, 0xC000 left), else stops Link. The hook (st_stick_move, hooks.txt) writes the same from the stick: any
 // direction, and a distance that grows with how far the stick is pushed. The stick also holds the D-pad direction it
 // points to (main.cpp, stick_dpad): the patch's 0x02044CB8 puts Link in his moving state only for a held D-pad, and
-// without it he barely moves. So it acts exactly where the patch's D-pad does (not in cutscenes, menus or talk), and
-// a build from the clean ROM has no analog stick (nothing at 0x02044B28: the stick is then an 8-way D-pad).
+// without it he barely moves. So it acts exactly where the patch's D-pad does (not in cutscenes, menus or talk). A
+// build from a clean ROM has no 0x02044B28: there st_pad_move (st_pad.cpp) calls this at the same place.
 #pragma once
 
 #include <cstdint>
