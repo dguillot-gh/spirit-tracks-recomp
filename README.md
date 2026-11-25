@@ -76,7 +76,31 @@ Ideas and features being considered next: [docs/WISHLIST.md](docs/WISHLIST.md).
 - Windows 10/11 64-bit, about 10 GB of disk, and an OpenGL 3.3 GPU for the GPU renderers.
 - For Android: an Android 8+ arm64 phone (OpenGL ES 3.2 for the GPU renderers) and a USB cable.
 
-## Quick start (new to this?)
+## Download and play (easiest)
+
+No tools to install: the program builds the game from your ROM on your own PC or phone, once, in about a minute (longer
+on slow machines). Nothing from the game is downloaded or included. You need your own USA dump (clean, D-pad patch or
+D-pad + QoL patch v0.9c; see [What you need](#what-you-need)).
+
+**Windows 10/11 (64-bit):**
+1. Download `SpiritTracks.exe` from the [latest release](../../releases/latest).
+2. Run it. The browser and Windows SmartScreen may warn that the file is unrecognised (it is not code-signed yet):
+   choose *Keep*, then *More info → Run anyway*.
+3. Select your ROM when it asks. It builds the game, then starts it. A newer `SpiritTracks.exe` rebuilds the game
+   by itself the first time it starts, saves kept.
+
+**Android 8+ (arm64):**
+1. Download `SpiritTracks.apk` from the [latest release](../../releases/latest) on the phone and open it (allow your
+   browser to install apps when Android asks; Play Protect may warn about an unknown app: *Install anyway*).
+2. Tap *Choose game ROM*, pick your dump, and let it build.
+3. Updates: when a new release is out, the start screen shows *Update to vX*; it downloads the new APK and Android asks
+   you to confirm. Your saves stay, and the game is built again for the new version. The check (GitHub's release list,
+   at most every 6 hours, nothing about you is sent) can be turned off in Settings.
+
+`SHA256SUMS.txt` in each release has the files' checksums. The version and commit are shown on the start screen
+(Android) and in the window title and menu (Windows).
+
+## Quick start: build it yourself
 
 You build the game on a Windows PC from your own copy of the game. It takes about an hour the first time, mostly
 waiting. Step by step:
