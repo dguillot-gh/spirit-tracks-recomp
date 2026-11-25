@@ -43,7 +43,7 @@ if(ANDROID)
   target_link_options(st_game PRIVATE -nostdlib)
 
   # SDL's Android activity loads the program as libmain.so and calls its SDL_main.
-  add_library(main SHARED src/main.cpp src/game_module.cpp src/st_hooks.cpp src/st_stick.cpp src/st_text.cpp
+  add_library(main SHARED src/main.cpp src/game_module.cpp src/st_hooks.cpp src/st_stick.cpp src/st_pad.cpp src/st_text.cpp
               ${ST_HD_FONT_SRC} src/png.cpp src/android_bridge.cpp src/gl_present.cpp src/gles_compat.cpp)
   target_include_directories(main PRIVATE src ${CMAKE_SOURCE_DIR}/third_party/stb)
   target_compile_options(main PRIVATE -O2)
@@ -104,7 +104,7 @@ else()
 endif()
 
 # ---- the program ----
-add_executable(SpiritTracks src/main.cpp src/game_module.cpp src/st_hooks.cpp src/st_stick.cpp src/st_text.cpp
+add_executable(SpiritTracks src/main.cpp src/game_module.cpp src/st_hooks.cpp src/st_stick.cpp src/st_pad.cpp src/st_text.cpp
                ${ST_HD_FONT_SRC} src/png.cpp src/gl_present.cpp src/menu.cpp)
 target_include_directories(SpiritTracks PRIVATE src ${CMAKE_SOURCE_DIR}/third_party/stb)
 set_target_properties(SpiritTracks PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})

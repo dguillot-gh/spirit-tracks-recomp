@@ -14,6 +14,14 @@ struct Addresses {
     uint32_t input_ptr;                     // the game's input (st_stick.cpp; the D-pad patch, USA only)
     uint32_t camera_yaw;                    // UnkStruct_027e09bc_0C::func_ov000_02078698 (st_stick.cpp)
     uint32_t camera_planes;                 // func_ov000_020764c0: the camera's view planes (st_camera_planes)
+    // The native D-pad controls (st_pad.cpp): the return addresses of the calls they act at, and functions they call.
+    uint32_t pad_move_ret;                  // func_ov017_020be44c's call of func_ov000_02096af4 (Link stops)
+    uint32_t pad_action_ret;                // ov000 0x020888F0's call of 0x02088834 (a slash under way)
+    uint32_t pad_by_ret;                    // func_ov017_020bcde8's call of func_ov102_0218323c
+    uint32_t pad_by_fn;                     // func_ov102_0218323c
+    uint32_t pad_a_hold_fn;                 // ov000 0x02070128 (stylus held, for an object)
+    uint32_t pad_world_to_screen;           // UnkStruct_027e09bc_0C::func_01ffd43c (ITCM)
+    uint32_t pad_touch_update;              // TouchControl::UpdateFlags
 };
 const Addresses& addresses();
 

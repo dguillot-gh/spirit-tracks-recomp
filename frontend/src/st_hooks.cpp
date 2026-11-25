@@ -18,9 +18,12 @@ namespace {
 // BKIP (Europe, Revision 0 and 1): the same symbols in the decomp's config/eur and config/eur1 (main's bss sits 0x20
 // higher; overlay 0 differs between the two revisions). Mapped by name, not tested on a European ROM yet.
 using st::Addresses;
-constexpr Addresses kUsa = {0x027E0198, 0x01FFBDC8, 0x0204AEFC, 0x0204C38C, 0x0204AEDC, 0x02078678, 0x020764A0};
-constexpr Addresses kEur = {0x027E0198, 0x01FFBDC8, 0x0204AF1C, 0x0204C3AC, 0x0204AEFC, 0x02078698, 0x020764C0};
-constexpr Addresses kEur1 = {0x027E0198, 0x01FFBDC8, 0x0204AF1C, 0x0204C3AC, 0x0204AEFC, 0x020786CC, 0x020764F4};
+constexpr Addresses kUsa = {0x027E0198, 0x01FFBDC8, 0x0204AEFC, 0x0204C38C, 0x0204AEDC, 0x02078678, 0x020764A0,
+                         0x020BE554, 0x02088964, 0x020BCF60, 0x0218321C, 0x02070128, 0x01FFD43C, 0x02014230};
+constexpr Addresses kEur = {0x027E0198, 0x01FFBDC8, 0x0204AF1C, 0x0204C3AC, 0x0204AEFC, 0x02078698, 0x020764C0,
+                         0x020BE574, 0x02088984, 0x020BCF80, 0x0218323C, 0x02070148, 0x01FFD43C, 0x02014230};
+constexpr Addresses kEur1 = {0x027E0198, 0x01FFBDC8, 0x0204AF1C, 0x0204C3AC, 0x0204AEFC, 0x020786CC, 0x020764F4,
+                          0x020BE5B4, 0x020889D0, 0x020BCFC0, 0x0218343C, 0x0207017C, 0x01FFD43C, 0x02014230};
 const Addresses* A = &kUsa;
 }  // namespace
 
@@ -81,6 +84,18 @@ extern "C" void st_camera_planes(NtrCpu* c) {
     ntr_wr32(c, guards + 8, ntr_rd32(c, guards + 8) | 1u);
 }
 
+// The native D-pad controls (st_pad.cpp).
+extern "C" int st_pad_move(NtrCpu* c);
+extern "C" int st_pad_action(NtrCpu* c);
+extern "C" int st_pad_a_hold(NtrCpu* c);
+extern "C" void st_pad_a_tap(NtrCpu* c);
+extern "C" void st_pad_roll(NtrCpu* c);
+extern "C" int st_pad_by(NtrCpu* c);
+extern "C" void st_pad_keys_right(NtrCpu* c);
+extern "C" void st_pad_keys_down(NtrCpu* c);
+extern "C" void st_pad_keys_select(NtrCpu* c);
+extern "C" void st_pad_keys_left(NtrCpu* c);
+
 // ITCM 0x01FFBD70: OS_IrqHandler.
 extern "C" void st_os_irq_handler(NtrCpu* c) { ntr::nitro::irq_handler(c, A->os_irq_table, A->os_irq_handler_thread_switch); }
 
@@ -119,6 +134,16 @@ void* find_hook(const char* name) {
         {"st_dsprot_detect", reinterpret_cast<void*>(&st_dsprot_detect)},
         {"st_dsprot_detect_not", reinterpret_cast<void*>(&st_dsprot_detect_not)},
         {"st_stick_move", reinterpret_cast<void*>(&st_stick_move)},
+        {"st_pad_move", reinterpret_cast<void*>(&st_pad_move)},
+        {"st_pad_action", reinterpret_cast<void*>(&st_pad_action)},
+        {"st_pad_a_hold", reinterpret_cast<void*>(&st_pad_a_hold)},
+        {"st_pad_a_tap", reinterpret_cast<void*>(&st_pad_a_tap)},
+        {"st_pad_roll", reinterpret_cast<void*>(&st_pad_roll)},
+        {"st_pad_by", reinterpret_cast<void*>(&st_pad_by)},
+        {"st_pad_keys_right", reinterpret_cast<void*>(&st_pad_keys_right)},
+        {"st_pad_keys_down", reinterpret_cast<void*>(&st_pad_keys_down)},
+        {"st_pad_keys_select", reinterpret_cast<void*>(&st_pad_keys_select)},
+        {"st_pad_keys_left", reinterpret_cast<void*>(&st_pad_keys_left)},
         {"ntr_nitro_save_context", reinterpret_cast<void*>(&ntr_nitro_save_context)},
         {"ntr_nitro_load_context", reinterpret_cast<void*>(&ntr_nitro_load_context)},
         {"ntr_nitro_init_context", reinterpret_cast<void*>(&ntr_nitro_init_context)},

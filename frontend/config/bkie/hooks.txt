@@ -3,6 +3,8 @@
 #   replace: the recompiled body is replaced by a call to the C function.
 #   before:  the C function is called on entry, then the recompiled body runs.
 #   instead: the C function (returning int) is called on entry; the recompiled body runs if it returns 0.
+#   at:      the C function is called just before the instruction at <address> (anywhere in a function).
+# An optional "=<word>" after the function: the hook applies only where that instruction word is (else left out).
 # The decomp leaves these NitroSDK functions unnamed (OS_func_0062..0064, func_01ffbd70); each was matched to Phantom
 # Hourglass's by size, order and literals (ST-PORT.md).
 
@@ -47,3 +49,17 @@ ov001 020c0f04 replace st_dsprot_detect        # DSProt_DetectEmulator
 ov001 020c0f7c replace st_dsprot_detect_not    # DSProt_DetectNotEmulator
 ov001 020c0ff4 replace st_dsprot_detect        # DSProt_DetectDummy
 ov001 020c106c replace st_dsprot_detect_not    # DSProt_DetectNotDummy
+
+# The D-pad controls without the D-pad patch (frontend/src/st_pad.cpp): at each place the patch changes, a hook does
+# what its routine does. Each names the clean code it expects there (=word), so a build from the patched ROM leaves it
+# out and keeps the patch's own code.
+ov000 02096ad4 instead st_pad_move          =e3a01000  # func_ov000_02096af4 (Link stops)
+ov000 02088834 instead st_pad_action        =e590106c  # a slash under way
+ov000 02070128 instead st_pad_a_hold        =e5d00005  # stylus held, for an object
+ov017 020be4e4 at      st_pad_a_tap         =e1a08000  # func_ov017_020be44c: A taps
+ov017 020bd324 at      st_pad_roll          =e1c7c4bc  # func_ov017_020bd300: A + direction rolls
+ov102 0218321c instead st_pad_by            =e92d4ff8  # func_ov102_0218323c: then B + Y
+ov024 020c5984 at      st_pad_keys_right    =e3100010  # AdventureModeManager::vfunc_24: Right
+ov024 020c5a08 at      st_pad_keys_down     =e3100080  # ... Down
+ov024 020c5b1c at      st_pad_keys_select   =e3100004  # ... Select
+ov093 02176010 at      st_pad_keys_left     =e3100021  # overlay 93: A or Left
