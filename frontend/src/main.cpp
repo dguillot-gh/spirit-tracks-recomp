@@ -1435,7 +1435,8 @@ int main(int argc, char** argv) {
     shared.shot_dir = data_dir / "screenshots";
     shared.state_dir = data_dir / "states";
     Host host(shared, window, audio, std::move(script), exit_after, unpaced);
-    host.set_resume(continue_arg && !testing, !testing);
+    // (a benchmark, --exit-after-frames without a script, may start from the resume state: --continue)
+    host.set_resume(continue_arg && script_path.empty(), !testing);
 #ifdef __ANDROID__
     const bool lifecycle_watch_registered = SDL_AddEventWatch(watch_android_lifecycle, &shared);
     if (!lifecycle_watch_registered) std::fprintf(stderr, "android: could not register SDL lifecycle event watch: %s\n", SDL_GetError());
