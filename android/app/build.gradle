@@ -33,6 +33,10 @@ android {
     ndkVersion = "28.2.13676358"
     defaultConfig {
         applicationId "com.strecomp.st"
+        // -PstAppSuffix=.fastcc: a test build that installs beside the release app (own data, own name).
+        if (project.findProperty('stAppSuffix')) applicationIdSuffix project.findProperty('stAppSuffix')
+        manifestPlaceholders = [appLabel: project.findProperty('stAppLabel')
+                ?: (project.findProperty('stAppSuffix') ? 'ST Fast (test)' : '@string/app_name')]
         minSdkVersion 26
         targetSdkVersion 35
         versionCode versionCodeProp
@@ -91,6 +95,19 @@ android {
             path '../../CMakeLists.txt'
             version cmakeVersion
         }
+    }
+    // -PstDeviceClang=<dir>: the phone clang + lld for the optimised game build (GameOptimizer.java), from
+    // tools/ondevice/fetch_termux_clang.py (lib*.so files) or build_device_llvm.sh (libllvm.so). They must sit
+    // unpacked in the native library folder to run, hence the legacy (extracted) packaging.
+    if (project.findProperty('stDeviceClang')) {
+        def clangJni = layout.buildDirectory.dir('device-clang-jni').get().asFile
+        copy {
+            from(project.findProperty('stDeviceClang')) { include '*.so'; rename 'llvm', 'libllvm.so' }
+            from(project.findProperty('stDeviceClang')) { include 'llvm'; rename 'llvm', 'libllvm.so' }
+            into new File(clangJni, 'arm64-v8a')
+        }
+        sourceSets { main { jniLibs.srcDirs += clangJni } }
+        packaging { jniLibs { useLegacyPackaging = true } }
     }
     buildFeatures {
         buildConfig true

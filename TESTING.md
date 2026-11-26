@@ -30,6 +30,60 @@ software renderer (1x, in the menu) is the safe fallback.
   2.0-2.2 GHz instead of about 1.5. SurfaceFlinger counted 40-45 frames shown per second in a quiet scene at
   Compute 2x; whether that is real misses or repeated frames is not yet known.
 
+## On-device compiler: clang vs TinyCC (2026-11-25, Moto G Stylus 2025 and Pixel 8)
+
+The game built on the phone from the D-pad + QoL ROM, once with TinyCC and once with clang -O2, then run from the
+same save states (the resume state and slots 1, 3, 6, 9) with `--unpaced --exit-after-frames 1320 --continue`
+(frames 120 to 1320 timed; the launcher's `bench_frames` extra). Frames per second, unpaced: above 60 is headroom.
+
+**Build time** (the whole game, 65 files / 100 MB of C): Moto G clang 518 s (5 at a time), TinyCC 11.7 s;
+Pixel 8 clang 369 s compile, TinyCC 8.7 s. PC, one thread: clang 390 s.
+
+| Phone | Renderer | Save spot | TinyCC | clang |
+|---|---|---|---|---|
+| Moto G | Compute x2 | resume | 54.3* | 76.3 |
+| Moto G | Compute x2 | slot 1 | 67.0 | 68.3 |
+| Moto G | Compute x2 | slot 3 | 89.2 | 90.3 |
+| Moto G | Compute x2 | slot 6 | 66.6 | 67.7 |
+| Moto G | Compute x2 | slot 9 | 66.5 | 67.3 |
+| Moto G | OpenGL x2 | resume | 77.2 | 77.0 |
+| Moto G | OpenGL x2 | slot 1 | 85.3 | 85.2 |
+| Moto G | OpenGL x2 | slot 3 | 105.1 | 105.3 |
+| Moto G | OpenGL x2 | slot 6 | 83.5 | 84.3 |
+| Moto G | OpenGL x2 | slot 9 | 81.6 | 80.5 |
+| Moto G | Software x1 | resume | 97.0 | 95.7 |
+| Moto G | Software x1 | slot 1 | 100.4 | 99.9 |
+| Moto G | Software x1 | slot 3 | 99.0 | 98.9 |
+| Moto G | Software x1 | slot 6 | 93.5 | 93.2 |
+| Moto G | Software x1 | slot 9 | 101.0 | 100.0 |
+| Pixel 8 | Compute x2 | resume | 116.5* | 199.1* |
+| Pixel 8 | Compute x2 | slot 1 | 113.5 | 113.9 |
+| Pixel 8 | Compute x2 | slot 3 | 147.8 | 146.1 |
+| Pixel 8 | Compute x2 | slot 6 | 115.0 | 116.7 |
+| Pixel 8 | Compute x2 | slot 9 | 103.2 | 103.9 |
+| Pixel 8 | OpenGL x2 | resume | 110.0 | 109.9 |
+| Pixel 8 | OpenGL x2 | slot 1 | 115.9 | 121.2 |
+| Pixel 8 | OpenGL x2 | slot 3 | 143.6 | 153.2 |
+| Pixel 8 | OpenGL x2 | slot 6 | 120.5 | 120.7 |
+| Pixel 8 | OpenGL x2 | slot 9 | 108.9 | 110.0 |
+| Pixel 8 | Software x1 | resume | 99.6 | 99.8 |
+| Pixel 8 | Software x1 | slot 1 | 102.3 | 103.0 |
+| Pixel 8 | Software x1 | slot 3 | 123.6 | 122.8 |
+| Pixel 8 | Software x1 | slot 6 | 99.1 | 97.7 |
+| Pixel 8 | Software x1 | slot 9 | 106.8 | 106.7 |
+
+\* The first runs of a series. Repeated three times each (TinyCC first): Moto G TinyCC 54.1, 77.2, 76.5 / clang 78.6,
+79.1, 76.1; Pixel 8 TinyCC 116.1, 187.2, 142.5 / clang 193.7, 154.8, 152.1. So the big gap was a first-run effect,
+not the compiler: once warm, TinyCC and clang run the same (within about 3%), and the Pixel 8 varies a lot run to run.
+
+**Findings**
+- The compiler is not what limits the frame rate: the game code is a small part of the frame. clang is never slower
+  and builds a smaller module (55 MB against 89 MB), but costs minutes of build time and a much bigger download.
+- The renderer matters more: on the Moto G, OpenGL x2 is 10-25% faster than Compute x2 in most spots.
+- The first run after a start can be much slower (54 against 77 fps on the Moto G): worth looking into, it may be a
+  hitch players feel (shader compiles, the module's first page-in, CPU clocks ramping up).
+- Both phones run every spot above 60 unpaced, at every renderer, with either compiler.
+
 ## Measured on the Pixel 8 and the LG V30 (2026-11-03)
 
 Each renderer set the way the menu does, the game continued from the same spot in gameplay, 20 s to settle, then 30 s
