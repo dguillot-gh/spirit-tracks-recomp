@@ -168,6 +168,27 @@ if(WIN32)
     VERBATIM)
   target_sources(SpiritTracks PRIVATE src/embedded_toolchain.cpp ${ST_TOOLCHAIN_CPP})
   set_source_files_properties(${ST_TOOLCHAIN_CPP} PROPERTIES INCLUDE_DIRECTORIES ${CMAKE_CURRENT_SOURCE_DIR}/src)
+  # The optimised build (pc_optimizer.cpp): clang + lld packed into the exe too. ST_PC_CLANG_DIR: a folder with
+  # clang.exe, ld.lld.exe, their DLLs, libmsvcrt.a, dllstart.c and chkstk_ms.S (CI: windows-exe.yml).
+  set(ST_DATA_NAME "" CACHE STRING "PC data folder name under %APPDATA%\\ST-Recomp (empty: SpiritTracks; test builds: their own)")
+  if(ST_DATA_NAME)
+    target_compile_definitions(SpiritTracks PRIVATE "ST_DATA_NAME=\"${ST_DATA_NAME}\"")
+  endif()
+  set(ST_PC_CLANG_DIR "" CACHE PATH "Folder with the clang + lld to pack into the exe for the optimised game build")
+  if(ST_PC_CLANG_DIR)
+    enable_language(ASM)
+    set(ST_CLANG_OUT ${CMAKE_CURRENT_BINARY_DIR}/clang_pack)
+    file(MAKE_DIRECTORY ${ST_CLANG_OUT})
+    file(GLOB ST_CLANG_INPUTS CONFIGURE_DEPENDS ${ST_PC_CLANG_DIR}/*)
+    add_custom_command(OUTPUT ${ST_CLANG_OUT}/clang_pack_index.cpp ${ST_CLANG_OUT}/clang_pack.S ${ST_CLANG_OUT}/clang_pack.bin
+      COMMAND ${CMAKE_COMMAND} -DDIR=${ST_PC_CLANG_DIR} -DOUT=${ST_CLANG_OUT} -P ${CMAKE_SOURCE_DIR}/tools/embed_clang.cmake
+      DEPENDS ${CMAKE_SOURCE_DIR}/tools/embed_clang.cmake ${ST_CLANG_INPUTS}
+      VERBATIM)
+    set_source_files_properties(${ST_CLANG_OUT}/clang_pack.S PROPERTIES OBJECT_DEPENDS ${ST_CLANG_OUT}/clang_pack.bin)
+    set_source_files_properties(${ST_CLANG_OUT}/clang_pack_index.cpp PROPERTIES INCLUDE_DIRECTORIES ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    target_sources(SpiritTracks PRIVATE src/pc_optimizer.cpp ${ST_CLANG_OUT}/clang_pack_index.cpp ${ST_CLANG_OUT}/clang_pack.S)
+    target_compile_definitions(SpiritTracks PRIVATE ST_PC_CLANG=1)
+  endif()
 endif()
 if(ST_GLES_SHADERS)  # (the gles-test preset: the phone's renderer, its ES shaders and gles_compat, on the PC)
   target_sources(SpiritTracks PRIVATE src/gles_compat.cpp)

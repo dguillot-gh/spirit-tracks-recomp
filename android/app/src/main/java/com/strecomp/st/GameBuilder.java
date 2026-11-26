@@ -18,7 +18,7 @@ final class GameBuilder {
 
     private static boolean loaded;
 
-    private static native String build(String rom, String assets, String out, String work);
+    private static native String build(String rom, String assets, String out, String work, String keepC);
 
     /** 0-100 while build() runs. */
     static native int progress();
@@ -33,8 +33,18 @@ final class GameBuilder {
             final File assets = new File(c.getFilesDir(), "stbuild");
             deleteTree(assets);
             unpack(c.getAssets(), "stbuild", assets);
+            // With the phone clang in the APK (GameOptimizer), the C and its headers stay for the optimised rebuild.
+            final boolean keep = GameOptimizer.available(c);
+            final File opt = GameOptimizer.dir(c);
+            deleteTree(opt);
             final String error = build(rom.getPath(), assets.getPath(), out.getPath(),
-                    new File(c.getCacheDir(), "stbuild-work").getPath());
+                    new File(c.getCacheDir(), "stbuild-work").getPath(), keep ? new File(opt, "gen").getPath() : null);
+            if (error == null && keep) {
+                if (!new File(assets, "tcc/include").renameTo(new File(opt, "inc"))
+                        || !new File(assets, "rt").renameTo(new File(opt, "rt"))) deleteTree(opt);
+            } else {
+                deleteTree(opt);
+            }
             deleteTree(assets);
             return error;
         } catch (IOException | UnsatisfiedLinkError e) {
@@ -56,7 +66,7 @@ final class GameBuilder {
         }
     }
 
-    private static void deleteTree(File f) {
+    static void deleteTree(File f) {
         final File[] kids = f.listFiles();
         if (kids != null) for (File k : kids) deleteTree(k);
         //noinspection ResultOfMethodCallIgnored

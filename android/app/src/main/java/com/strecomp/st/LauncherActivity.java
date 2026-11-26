@@ -9,6 +9,7 @@ import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.util.TypedValue;
 import android.view.Gravity;
@@ -167,6 +168,7 @@ public final class LauncherActivity extends Activity {
         look.hideSystemBars();
         refresh();
         UpdateCheck.maybeCheck(this, prefs(), this::refresh);
+        if (BuildConfig.SHELL && !building && module().isFile()) OptimizeService.start(this);  // (cut short before)
         if (getIntent() != null && getIntent().getBooleanExtra(EXTRA_RELAUNCH, false)) {
             getIntent().removeExtra(EXTRA_RELAUNCH);
             if (resume("state").isFile()) relaunchWhenGameGone(System.currentTimeMillis() + 4000);
@@ -253,11 +255,36 @@ public final class LauncherActivity extends Activity {
                         + (rom().length() >> 20) + " MB)\n\nChoose the ROM again to replace it. Saves and save "
                         + "states stay." + (BuildConfig.SHELL ? "\n\nGame module: " + (module().isFile()
                         ? (module().length() >> 20) + " MB, " + new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US)
-                        .format(new Date(module().lastModified())) : "none") + ". Rebuild it after an app update." : ""))
+                        .format(new Date(module().lastModified())) : "none") + ". Rebuild it after an app update."
+                        + optimisedText() : ""))
                 .setPositiveButton("Choose ROM…", (d, w) -> pick(PICK_ROM))
                 .setNegativeButton("Back", null);
         if (BuildConfig.SHELL) b.setNeutralButton("Rebuild game", (d, w) -> buildGame(false));
         b.show();
+    }
+
+    /** The optimised build's state, for the Game ROM dialog (GameOptimizer). */
+    private String optimisedText() {
+        if (!GameOptimizer.available(this)) return "";
+        if (OptimizeService.running()) return "
+
+Optimising: " + Math.max(0, GameOptimizer.progress) + "%";
+        final File done = new File(getFilesDir(), "game/optimised.txt");
+        if (done.isFile()) {
+            try (BufferedReader r = new BufferedReader(new FileReader(done))) {
+                return "
+
+Optimised (" + r.readLine() + ")";
+            } catch (IOException ignored) {
+                // (fall through)
+            }
+        }
+        final String err = OptimizeService.result;
+        return err != null && !err.isEmpty() ? "
+
+Optimising failed: " + err : "
+
+Not optimised yet (quick build).";
     }
 
     /** When the resume state was written ("MM-DD HH:MM", from resume.txt). */
@@ -331,14 +358,23 @@ public final class LauncherActivity extends Activity {
         new Thread(() -> {
             //noinspection ResultOfMethodCallIgnored
             module().delete();
+            //noinspection ResultOfMethodCallIgnored
+            new File(getFilesDir(), "game/optimised.txt").delete();
             runOnUiThread(tick);
             final String error = GameBuilder.run(this, rom(), module());
             if (error == null) stampModule();
             final long secs = (System.currentTimeMillis() - start) / 1000;
+            android.util.Log.i("STOpt", "quick build (TinyCC) " + (error == null ? "done" : "failed") + " in "
+                    + (System.currentTimeMillis() - start) + " ms");
             runOnUiThread(() -> {
                 building = false;
                 dialog.dismiss();
                 refresh();
+                if (error == null) {
+                    if (Build.VERSION.SDK_INT >= 33)
+                        requestPermissions(new String[] {"android.permission.POST_NOTIFICATIONS"}, 3);
+                    OptimizeService.start(this);
+                }
                 new AlertDialog.Builder(this).setMessage(error == null
                                 ? "The game is ready (built in " + secs + " s). Press Start game." : error)
                         .setPositiveButton("OK", null).show();

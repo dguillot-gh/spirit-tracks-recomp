@@ -5,7 +5,9 @@ name: Windows exe + Android shell APK
 on:
   workflow_dispatch:
   push:
-    tags: ['build-*', 'v*']  # v*: also publish a GitHub Release with the exe and the APK as plain files
+    # v*: also publish a GitHub Release with the exe and the APK as plain files. fastcc-*: a test build that sits beside
+    # the release (APK com.strecomp.st.fastcc "ST Fast (test)", exe data folder SpiritTracksFast).
+    tags: ['build-*', 'v*', 'fastcc-*']
 jobs:
   windows:
     runs-on: windows-latest
@@ -23,16 +25,27 @@ jobs:
           gh release download 20261020 -R mstorsjo/llvm-mingw -p '*-ucrt-x86_64.zip' -D "$RUNNER_TEMP"
           7z x -y -o"$RUNNER_TEMP" "$RUNNER_TEMP"/llvm-mingw-*-ucrt-x86_64.zip > /dev/null
           echo "$(cygpath -w "$(ls -d "$RUNNER_TEMP"/llvm-mingw-*-ucrt-x86_64 | head -1)")\\bin" >> "$GITHUB_PATH"
+      - name: clang + lld for the optimised game build (packed into the exe, pc_optimizer.cpp)
+        run: |
+          L="$(ls -d "$RUNNER_TEMP"/llvm-mingw-*-ucrt-x86_64 | head -1)"; P="$RUNNER_TEMP/clang-pack"; mkdir -p "$P"
+          cp "$(ls "$L"/bin/clang-[0-9]*.exe | head -1)" "$P/clang.exe"
+          cp "$L"/bin/ld.lld.exe "$L"/bin/libLLVM-*.dll "$L"/bin/libclang-cpp.dll "$L"/bin/libc++.dll "$L"/bin/libunwind.dll "$P/"
+          # memcpy and friends from msvcrt.dll, like the TinyCC build
+          "$L"/bin/llvm-dlltool -m i386:x86-64 -d third_party/tinycc/win32/lib/msvcrt.def -l "$P/libmsvcrt.a"
+          cp tools/ondevice/dllstart.c tools/ondevice/chkstk_ms.S "$P/"
+          ls -la "$P"
+          echo "ST_PC_CLANG_DIR=$(cygpath -m "$P")" >> "$GITHUB_ENV"
       - name: Configure
         run: |
           # The version the exe shows: the tag without its v (v0.2.1 -> 0.2.1), as the APK; else the project's.
           ver=""; [[ "$GITHUB_REF" == refs/tags/v* ]] && ver="-DST_VERSION=${GITHUB_REF_NAME#v}"
+          [[ "$GITHUB_REF" == refs/tags/fastcc-* ]] && ver="-DST_DATA_NAME=SpiritTracksFast"
           # -static: bake libc++ and libunwind into the exe so players don't need libc++.dll / libunwind.dll.
           cmake -S . -B build/ci -G Ninja -DCMAKE_BUILD_TYPE=Release $ver \
             -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_RC_COMPILER=windres \
             "-DCMAKE_CXX_FLAGS=-include algorithm" \
             "-DCMAKE_EXE_LINKER_FLAGS=-static" \
-            -DFFCC_BUILD_TESTS=OFF
+            -DFFCC_BUILD_TESTS=OFF "-DST_PC_CLANG_DIR=$ST_PC_CLANG_DIR"
       - name: Build
         run: cmake --build build/ci --target SpiritTracks -j 4
       - name: Package
@@ -71,6 +84,8 @@ jobs:
           name="0.0.0-${GITHUB_SHA::7}"; [[ "$GITHUB_REF" == refs/tags/v* ]] && name="${GITHUB_REF_NAME#v}"
           echo "code=$code" >> "$GITHUB_OUTPUT"
           args="-PstVersionCode=$code -PstVersionName=$name -PstUpdateRepo=$GITHUB_REPOSITORY -PstCommit=${GITHUB_SHA::7}"
+          # fastcc-* tags: a test app beside the release one (own package and data, no update check)
+          [[ "$GITHUB_REF" == refs/tags/fastcc-* ]] && args="-PstVersionCode=$code -PstVersionName=$name -PstCommit=${GITHUB_SHA::7} -PstAppSuffix=.fastcc"
           # The release key (repo secrets): every APK signed the same, so updates install over each other.
           if [ -n "$ST_KEYSTORE_B64" ]; then
             echo "$ST_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/release.jks"
@@ -94,6 +109,8 @@ jobs:
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;28.2.13676358" "cmake;3.31.6" > /dev/null
       - name: SDL source
         run: git clone --depth 1 -b release-3.4.18 https://github.com/libsdl-org/SDL.git "$RUNNER_TEMP/sdl3-src"
+      - name: Phone clang + lld for the optimised game build (GameOptimizer.java)
+        run: python3 tools/ondevice/fetch_termux_clang.py "$RUNNER_TEMP/device-clang"
       - name: Build shell APK
         env:
           ST_KEYSTORE_PASSWORD: ${{ secrets.ST_KEYSTORE_PASSWORD }}
@@ -105,7 +122,7 @@ jobs:
           cp "$RUNNER_TEMP"/sdl3-src/android-project/app/src/main/java/org/libsdl/app/*.java android/app/src/main/java/org/libsdl/app/
           chmod +x android/gradlew
           android/gradlew --no-daemon -p android :app:assembleDebug -PstShell -PstCmakeVersion=3.31.6 \
-            "-PstSdlSource=$RUNNER_TEMP/sdl3-src" $ST_GRADLE_ARGS \
+            "-PstSdlSource=$RUNNER_TEMP/sdl3-src" "-PstDeviceClang=$RUNNER_TEMP/device-clang" $ST_GRADLE_ARGS \
             "-PstKeystorePassword=$ST_KEYSTORE_PASSWORD" "-PstKeyAlias=$ST_KEY_ALIAS" "-PstKeyPassword=$ST_KEY_PASSWORD"
           unzip -l android/app/build/outputs/apk/debug/app-debug.apk | grep -E "\.so$"
           "$(ls -d "$ANDROID_HOME"/build-tools/* | tail -1)"/apksigner verify --print-certs android/app/build/outputs/apk/debug/app-debug.apk | grep -i "SHA-256" || true

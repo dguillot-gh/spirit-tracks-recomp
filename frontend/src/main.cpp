@@ -50,6 +50,13 @@
 #include "ntr/runtime.hpp"
 #include "pad_input.hpp"
 #include "perf_hint.hpp"
+#ifdef ST_PC_CLANG
+#include "pc_optimizer.hpp"
+#endif
+// The PC data folder's name (%APPDATA%\ST-Recomp\<name>): test builds get their own (-DST_DATA_NAME=...).
+#ifndef ST_DATA_NAME
+#define ST_DATA_NAME "SpiritTracks"
+#endif
 #include "st_stick.hpp"
 #include "st_hooks.hpp"
 #include "st_text.hpp"
@@ -561,6 +568,13 @@ public:
         else
             rt_->release_touch();
 
+        // Benchmark (--unpaced --exit-after-frames N, e.g. with --continue): the time from frame 120 (the resume
+        // state has loaded) to the last frame, in the log.
+        if (exit_after_ && f == 120) bench_start_ns_ = SDL_GetTicksNS();
+        if (exit_after_ && f >= exit_after_ && bench_start_ns_ && f > 120) {
+            const double s = double(SDL_GetTicksNS() - bench_start_ns_) / 1e9;
+            SDL_Log("bench: %llu frames in %.3f s = %.1f fps", (unsigned long long)(f - 120), s, double(f - 120) / s);
+        }
         if (quit || (exit_after_ && f >= exit_after_)) return false;
         if (s_.paused.load() && resume_ && !s_.resume_done.load()) {
             // Android, going to the background (where the app may be killed): first the resume state, a frame or
@@ -933,6 +947,7 @@ private:
     SDL_AudioStream* audio_;
     std::vector<ScriptStep> script_;
     uint64_t exit_after_;
+    uint64_t bench_start_ns_ = 0;
     bool unpaced_;
     ntr::Runtime* rt_ = nullptr;
     ntr::Frame last_{};  // (a copy: the runtime's goes when on_frame returns)
@@ -1166,8 +1181,26 @@ bool first_run_setup(const fs::path& base, const fs::path& data_dir, fs::path& r
         // The compiler's files travel inside the exe: unpack them next to the work folder, remove them afterwards.
         const fs::path tools = data_dir / "build-tools";
         error = st::unpack_toolchain(u8(tools));
+#ifdef ST_PC_CLANG
+        // With clang in the exe, the C and its headers stay for the optimised build (pc_optimizer.cpp).
+        const fs::path opt = st::pc_opt_dir(data_dir);
+        std::error_code opt_ec;
+        fs::remove_all(opt, opt_ec);
+        fs::remove(st::pc_opt_module(data_dir), opt_ec);
+        fs::remove(st::pc_opt_stamp(data_dir), opt_ec);
+        const std::string keep_c = u8(opt / "gen");
+#else
+        const std::string keep_c;
+#endif
         if (error.empty())
-            error = st::build_game(u8(rom_path), u8(tools), u8(module), u8(data_dir / "build-work"), progress);
+            error = st::build_game(u8(rom_path), u8(tools), u8(module), u8(data_dir / "build-work"), progress, keep_c);
+#ifdef ST_PC_CLANG
+        if (error.empty()) {
+            fs::rename(tools / "tcc" / "include", opt / "inc", opt_ec);
+            if (!opt_ec) fs::rename(tools / "rt", opt / "rt", opt_ec);
+            if (opt_ec) fs::remove_all(opt, opt_ec);
+        }
+#endif
         std::error_code rm_ec;
         fs::remove_all(tools, rm_ec);
         finished = true;
@@ -1267,7 +1300,7 @@ int main(int argc, char** argv) {
     if (data_dir.empty()) {
         if (fs::exists(base / "portable.txt", ec)) {
             data_dir = base / "data";
-        } else if (char* pref = SDL_GetPrefPath("ST-Recomp", "SpiritTracks")) {
+        } else if (char* pref = SDL_GetPrefPath("ST-Recomp", ST_DATA_NAME)) {
             data_dir = pref;
             SDL_free(pref);
         }
@@ -1303,6 +1336,17 @@ int main(int argc, char** argv) {
             if (!first_run_setup(base, data_dir, rom_path, module_path)) return 0;
             if (!exe_id.empty()) std::ofstream(id_path) << exe_id << '\n';
         }
+#ifdef ST_PC_CLANG
+        // The optimised build (clang -O2) when this exe made it, else start it (or carry on) in the background.
+        std::string opt_id;
+        if (std::ifstream f(st::pc_opt_stamp(data_dir)); f) std::getline(f, opt_id);
+        if (!exe_id.empty() && opt_id == exe_id && fs::exists(st::pc_opt_module(data_dir), ec)) {
+            module_path = st::pc_opt_module(data_dir);
+            std::fprintf(stderr, "game: the optimised build (%s)\n", module_path.string().c_str());
+        } else {
+            st::pc_opt_start(data_dir, exe_id);
+        }
+#endif
     }
 #endif
     if (rom_path.empty()) rom_path = base / "rom" / "bkie.nds";
