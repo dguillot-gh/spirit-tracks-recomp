@@ -266,25 +266,17 @@ public final class LauncherActivity extends Activity {
     /** The optimised build's state, for the Game ROM dialog (GameOptimizer). */
     private String optimisedText() {
         if (!GameOptimizer.available(this)) return "";
-        if (OptimizeService.running()) return "
-
-Optimising: " + Math.max(0, GameOptimizer.progress) + "%";
+        if (OptimizeService.running()) return "\n\nOptimising: " + Math.max(0, GameOptimizer.progress) + "%";
         final File done = new File(getFilesDir(), "game/optimised.txt");
         if (done.isFile()) {
             try (BufferedReader r = new BufferedReader(new FileReader(done))) {
-                return "
-
-Optimised (" + r.readLine() + ")";
+                return "\n\nOptimised (" + r.readLine() + ")";
             } catch (IOException ignored) {
                 // (fall through)
             }
         }
         final String err = OptimizeService.result;
-        return err != null && !err.isEmpty() ? "
-
-Optimising failed: " + err : "
-
-Not optimised yet (quick build).";
+        return err != null && !err.isEmpty() ? "\n\nOptimising failed: " + err : "\n\nNot optimised yet (quick build).";
     }
 
     /** When the resume state was written ("MM-DD HH:MM", from resume.txt). */
