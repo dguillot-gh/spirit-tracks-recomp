@@ -1174,7 +1174,7 @@ bool first_run_setup(const fs::path& base, const fs::path& data_dir, fs::path& r
     SDL_Window* window = SDL_CreateWindow(kTitle, 520, 120, 0);
     SDL_Renderer* renderer = window ? SDL_CreateRenderer(window, nullptr) : nullptr;
     std::atomic<int> progress{0};
-    std::atomic<bool> finished{false};
+    std::atomic<bool> finished{false}, clang_phase{false};
     std::string error;
     std::thread worker([&] {
         const auto u8 = [](const fs::path& p) { const auto s = p.u8string(); return std::string(s.begin(), s.end()); };
@@ -1182,24 +1182,32 @@ bool first_run_setup(const fs::path& base, const fs::path& data_dir, fs::path& r
         const fs::path tools = data_dir / "build-tools";
         error = st::unpack_toolchain(u8(tools));
 #ifdef ST_PC_CLANG
-        // With clang in the exe, the C and its headers stay for the optimised build (pc_optimizer.cpp).
-        const fs::path opt = st::pc_opt_dir(data_dir);
-        std::error_code opt_ec;
-        fs::remove_all(opt, opt_ec);
-        fs::remove(st::pc_opt_module(data_dir), opt_ec);
-        fs::remove(st::pc_opt_stamp(data_dir), opt_ec);
-        const std::string keep_c = u8(opt / "gen");
-#else
-        const std::string keep_c;
-#endif
-        if (error.empty())
-            error = st::build_game(u8(rom_path), u8(tools), u8(module), u8(data_dir / "build-work"), progress, keep_c);
-#ifdef ST_PC_CLANG
+        // clang first (pc_optimizer.cpp): recompile to C, then clang -O2 compiles it; TinyCC only when that fails.
         if (error.empty()) {
-            fs::rename(tools / "tcc" / "include", opt / "inc", opt_ec);
-            if (!opt_ec) fs::rename(tools / "rt", opt / "rt", opt_ec);
-            if (opt_ec) fs::remove_all(opt, opt_ec);
+            const fs::path opt = st::pc_opt_dir(data_dir);
+            std::error_code opt_ec;
+            std::atomic<int> step{0};
+            std::string clang_error = st::build_game(u8(rom_path), u8(tools), u8(module), u8(data_dir / "build-work"),
+                                                     step, u8(opt / "gen"), false);
+            if (clang_error.empty()) {
+                fs::rename(tools / "tcc" / "include", opt / "inc", opt_ec);
+                if (!opt_ec) fs::rename(tools / "rt", opt / "rt", opt_ec);
+                if (opt_ec) clang_error = "cannot keep the compiler's headers: " + opt_ec.message();
+            }
+            if (clang_error.empty()) {
+                clang_phase = true;
+                clang_error = st::pc_clang_build(data_dir, module, progress);
+            }
+            fs::remove_all(opt, opt_ec);
+            if (!clang_error.empty()) {  // (TinyCC: a working, slower game)
+                std::fprintf(stderr, "setup: clang failed, TinyCC instead: %s\n", clang_error.c_str());
+                clang_phase = false;
+                error = st::build_game(u8(rom_path), u8(tools), u8(module), u8(data_dir / "build-work"), progress);
+            }
         }
+#else
+        if (error.empty())
+            error = st::build_game(u8(rom_path), u8(tools), u8(module), u8(data_dir / "build-work"), progress);
 #endif
         std::error_code rm_ec;
         fs::remove_all(tools, rm_ec);
@@ -1211,8 +1219,12 @@ bool first_run_setup(const fs::path& base, const fs::path& data_dir, fs::path& r
         while (SDL_PollEvent(&e)) {}  // (closing the window waits for the build: TinyCC can't be stopped midway)
         const int p = progress;
         if (window) {
-            const std::string title = std::string(p < 20 ? "Recompiling your ROM... " : "Building the game... ") +
-                                      std::to_string(p) + "%";
+            const uint64_t s = (SDL_GetTicks() - start) / 1000;
+            char clock[16];
+            std::snprintf(clock, sizeof clock, " (%u:%02u)", unsigned(s / 60), unsigned(s % 60));
+            const std::string title = std::string(clang_phase ? "Compiling the game with clang (best speed, once)... "
+                                                  : p < 20 ? "Recompiling your ROM... " : "Building the game... ") +
+                                      std::to_string(p) + "%" + clock;
             SDL_SetWindowTitle(window, title.c_str());
         }
         if (renderer) {
@@ -1336,17 +1348,6 @@ int main(int argc, char** argv) {
             if (!first_run_setup(base, data_dir, rom_path, module_path)) return 0;
             if (!exe_id.empty()) std::ofstream(id_path) << exe_id << '\n';
         }
-#ifdef ST_PC_CLANG
-        // The optimised build (clang -O2) when this exe made it, else start it (or carry on) in the background.
-        std::string opt_id;
-        if (std::ifstream f(st::pc_opt_stamp(data_dir)); f) std::getline(f, opt_id);
-        if (!exe_id.empty() && opt_id == exe_id && fs::exists(st::pc_opt_module(data_dir), ec)) {
-            module_path = st::pc_opt_module(data_dir);
-            std::fprintf(stderr, "game: the optimised build (%s)\n", module_path.string().c_str());
-        } else {
-            st::pc_opt_start(data_dir, exe_id);
-        }
-#endif
     }
 #endif
     if (rom_path.empty()) rom_path = base / "rom" / "bkie.nds";

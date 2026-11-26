@@ -19,9 +19,9 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * The optimised game build: after TinyCC's quick build (GameBuilder), the same C is compiled again with clang -O2 on
- * the phone, several files at a time, and linked with lld into a faster files/game/libst_game.so, which replaces the
- * quick one (the next game start uses it). clang and lld come in the APK's native library folder, the only place
+ * The game build with clang: the C from the recompiler (GameBuilder.run without TinyCC) is compiled with clang -O2 on
+ * the phone, several files at a time, and linked with lld into files/game/libst_game.so (OptimizeService runs it, with
+ * a notification; TinyCC builds it instead when this fails). clang and lld come in the APK's native library folder, the only place
  * Android lets an app run programs from:
  * - libllvm.so: one program holding both ("libllvm.so clang ...", "libllvm.so ld.lld ...";
  *   tools/ondevice/build_device_llvm.sh), or
@@ -62,9 +62,9 @@ final class GameOptimizer {
                 : new ArrayList<>(Arrays.asList(lib(c, "liblld_exe.so").getPath(), "-flavor", "gnu"));
     }
 
-    /** How many files at once: half the cores (the big ones), at most 4, and ~600 MB of free memory each. */
+    /** How many files at once: every core up to 6 (the player waits for this build), ~600 MB of free memory each. */
     static int jobs(Context c) {
-        int n = Math.max(1, Math.min(4, Runtime.getRuntime().availableProcessors() / 2));
+        int n = Math.max(1, Math.min(6, Runtime.getRuntime().availableProcessors()));
         final ActivityManager am = (ActivityManager) c.getSystemService(Context.ACTIVITY_SERVICE);
         if (am != null) {
             final ActivityManager.MemoryInfo mi = new ActivityManager.MemoryInfo();
@@ -99,11 +99,7 @@ final class GameOptimizer {
         progress = 0;
         Log.i(TAG, "optimised build: " + sources.length + " files, " + (all >> 20) + " MB of C, " + jobs + " at once, "
                 + LEVEL + (mixed ? " (hot functions only, the rest from TinyCC)" : ""));
-        final ExecutorService pool = Executors.newFixedThreadPool(jobs, r -> new Thread(() -> {
-            // Below the game's threads: the compilers (children of this thread) inherit its nice value.
-            android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_BACKGROUND);
-            r.run();
-        }));
+        final ExecutorService pool = Executors.newFixedThreadPool(jobs);
         for (File src : sources) {
             pool.execute(() -> {
                 if (error.get() != null) return;

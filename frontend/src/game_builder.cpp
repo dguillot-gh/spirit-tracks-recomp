@@ -37,7 +37,7 @@ std::string u8(const fs::path& p) {
 }  // namespace
 
 std::string build_game(const std::string& rom_path, const std::string& assets, const std::string& out_module,
-                       const std::string& work, std::atomic<int>& progress, const std::string& keep_c) {
+                       const std::string& work, std::atomic<int>& progress, const std::string& keep_c, bool compile) {
     progress = 0;
     std::error_code ec;
     const fs::path gen = fs::u8path(work) / "gen", obj = fs::u8path(work) / "obj";
@@ -69,6 +69,16 @@ std::string build_game(const std::string& rom_path, const std::string& assets, c
         return std::string("Recompiling failed: ") + e.what();
     }
     progress = 20;
+    if (!compile) {  // (clang compiles it: hand the C over)
+        const fs::path keep = fs::u8path(keep_c);
+        fs::remove_all(keep, ec);
+        fs::create_directories(keep.parent_path(), ec);
+        fs::rename(gen, keep, ec);
+        if (ec) return "Cannot keep the C for the compiler: " + ec.message();
+        fs::remove_all(fs::u8path(work), ec);
+        progress = 100;
+        return "";
+    }
 
     // ---- 2. compile each C file to an object (one TinyCC state each), then link the module ----
     std::vector<fs::path> sources;
