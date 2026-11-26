@@ -62,14 +62,15 @@ final class GameOptimizer {
                 : new ArrayList<>(Arrays.asList(lib(c, "liblld_exe.so").getPath(), "-flavor", "gnu"));
     }
 
-    /** How many files at once: every core up to 6 (the player waits for this build), ~600 MB of free memory each. */
+    /** How many files at once: every core up to 6 (the player waits for this build), memory permitting. */
     static int jobs(Context c) {
         int n = Math.max(1, Math.min(6, Runtime.getRuntime().availableProcessors()));
         final ActivityManager am = (ActivityManager) c.getSystemService(Context.ACTIVITY_SERVICE);
         if (am != null) {
             final ActivityManager.MemoryInfo mi = new ActivityManager.MemoryInfo();
             am.getMemoryInfo(mi);
-            n = (int) Math.max(1, Math.min(n, mi.availMem / (600L << 20)));
+            // (~450 MB per compiler at most; Android frees cached apps for it, so count all memory, 1.3 GB per job)
+            n = (int) Math.max(1, Math.min(n, mi.totalMem / (1300L << 20)));
         }
         return n;
     }

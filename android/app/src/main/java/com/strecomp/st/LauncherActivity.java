@@ -79,7 +79,7 @@ public final class LauncherActivity extends Activity {
     private File module() { return new File(getFilesDir(), "game/libst_game.so"); }
 
     private static final String MODULE_HELP = "The game is built on this phone from your ROM: nothing from the game is "
-            + "downloaded. It takes about a minute, once.";
+            + "downloaded. It takes a few minutes, once.";
 
     /** Which app install the game module was built by (lastUpdateTime:versionCode); a newer app rebuilds it. */
     private File moduleStamp() { return new File(getFilesDir(), "game/built-for.txt"); }
@@ -163,6 +163,15 @@ public final class LauncherActivity extends Activity {
         refresh();
         UpdateCheck.maybeCheck(this, prefs(), this::refresh);
         if (BuildConfig.SHELL && !building && OptimizeService.running()) buildGame(false);  // (the build goes on)
+        // Benchmark from adb (the game activity is not exported): am start -n <pkg>/com.strecomp.st.LauncherActivity
+        //   --ei bench_frames 1320 [--ez bench_continue true]  ->  the game unpaced, quits after N frames, log "bench:".
+        if (getIntent() != null && getIntent().getIntExtra("bench_frames", 0) > 0) {
+            final int n = getIntent().getIntExtra("bench_frames", 0);
+            final boolean cont = getIntent().getBooleanExtra("bench_continue", false);
+            getIntent().removeExtra("bench_frames");
+            startActivity(new Intent(this, GameActivity.class).putExtra("unpaced", true).putExtra("exit_after", n)
+                    .putExtra(GameActivity.EXTRA_CONTINUE, cont));
+        }
         if (getIntent() != null && getIntent().getBooleanExtra(EXTRA_RELAUNCH, false)) {
             getIntent().removeExtra(EXTRA_RELAUNCH);
             if (resume("state").isFile()) relaunchWhenGameGone(System.currentTimeMillis() + 4000);
