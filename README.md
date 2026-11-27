@@ -140,13 +140,14 @@ D-pad + QoL patch v0.9c; see [What you need](#what-you-need)).
 
 ## The launcher, changing the ROM, starting over (Windows)
 
-After the first build, `SpiritTracks.exe` opens a launcher before the game: **Continue** (where you last quit) or
-**Start game**, **Change ROM...** (pick another dump: the game is built again from it, saves kept), **Rebuild game**
-(from the kept ROM), **Open data folder**, **Quit**, and the main settings (screen, renderer, resolution, 3D textures,
-widescreen, fullscreen, HD text; the in-game menu, F1 or Esc, has the rest). Mouse, keyboard (arrows, Enter, Esc) and
-gamepad (D-pad, A) all work. `--no-launcher` starts the game straight away; `--setup` builds again from the command line.
+After the first build, `SpiritTracks.exe` opens a launcher before the game. The game page has **CONTINUE** (where you last quit) or
+**PLAY**, and **Start game** (from the title screen). The cog opens Settings, which has two tabs. **Display** holds the
+main settings: screen, renderer, resolution, 3D textures, widescreen, fullscreen and HD text. The in-game menu (F1 or
+Esc) has the rest. **Game files** has **Change ROM...** (pick another dump: the game is built again from it, saves
+kept), **Rebuild game** (from the kept ROM) and **Open folder** (the data folder). The X quits. Mouse, keyboard
+(arrows, Enter, Esc) and gamepad (D-pad, A, B, shoulder buttons) all work. `--no-launcher` starts the game straight away; `--setup` builds again from the command line.
 
-Everything lives in the data folder (the launcher's **Open data folder** opens it):
+Everything lives in the data folder (the launcher's Settings, **Game files**, **Open folder** opens it):
 
 - `%APPDATA%\ST-Recomp\SpiritTracks` (paste it into Explorer's address bar), or
 - `data\` next to the exe when a file named `portable.txt` is next to it (a portable copy, e.g. on a USB stick).
