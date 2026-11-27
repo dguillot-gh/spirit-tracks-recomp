@@ -35,7 +35,7 @@ struct MenuState {
     bool stick = false;        // a gamepad's left stick moves Link as an analog stick (else it is the D-pad)
     bool wide = false;         // widescreen (GPU and Compute renderers)
     int wide_mode = 1;         // with wide: 1 16:9, 2 21:9, 3 16:10
-    int textures = 0;          // the 3D's textures (GPU renderer): 0 the DS's pixels, 1 smooth, 2 sharp
+    int textures = 0;          // the 3D's textures (GPU renderer): 0 the DS's pixels, 1 smooth, 2 sharp, 3 xBR
     int fixes = 0;             // 3D fixes, bits: 1 fewer seams (GPU renderer), 2 stable textures
     bool compute = false;      // with gpu: the compute-shader renderer (texture filtering is unavailable)
     bool hd_text = false;      // HD vector dialogue text (Inter Bold TrueType font)

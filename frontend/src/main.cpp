@@ -17,7 +17,7 @@
 //
 //   SpiritTracks.exe <rom.nds> [--save-file F] [--data-dir D] [--input-script S] [--exit-after-frames N]
 //                        [--fullscreen] [--unpaced] [--module M] [--read-only-save] [--renderer software|compute|opengl]
-//                        [--scale 2|4|6|8] [--continue] [--wide] [--wide21] [--wide1610] [--textures pixels|smooth|sharp]
+//                        [--scale 2|4|6|8] [--continue] [--wide] [--wide21] [--wide1610] [--textures pixels|smooth|sharp|xbr]
 //                        [--fixes 0-3] [--hd-text] [--language auto|en|fr|de|it|es]
 #include <SDL3/SDL.h>
 #ifdef __ANDROID__
@@ -248,7 +248,7 @@ struct Settings {
     bool stick = false;   // the analog stick moves Link (a gamepad's left stick, the phone's on-screen stick)
     bool wide = false;    // widescreen, 16:9 (a test; GPU and Compute renderers)
     int wide_mode = 1;    // 1: 16:9, 2: 21:9, 3: 16:10
-    int textures = 0;     // the 3D's textures with the GPU renderer: 0 the DS's pixels, 1 smooth, 2 sharp
+    int textures = 0;     // the 3D's textures with the GPU renderer: 0 the DS's pixels, 1 smooth, 2 sharp, 3 xBR
     int fixes = 0;        // 3D fixes, bits: 1 fewer seams (GPU renderer's better polygons), 2 stable textures (no warp)
     bool hd_text = false; // render OBJ dialogue text with an embedded vector TrueType font
     int language = kLangAuto;  // DS firmware language: -1 auto (system locale), 0-5 explicit DS code
@@ -274,7 +274,7 @@ Settings load_settings(const fs::path& p) {
         else if (k == "stick") s.stick = v == "1";
         else if (k == "wide") s.wide = v == "1";
         else if (k == "wide_mode") s.wide_mode = std::clamp(std::atoi(v.c_str()), 1, 3);
-        else if (k == "textures") s.textures = std::clamp(std::atoi(v.c_str()), 0, 2);
+        else if (k == "textures") s.textures = std::clamp(std::atoi(v.c_str()), 0, 3);
         else if (k == "fixes") s.fixes = std::clamp(std::atoi(v.c_str()), 0, 3);
         else if (k == "hd_text") s.hd_text = v == "1";
         else if (k == "language") {
@@ -321,7 +321,8 @@ ntr::VideoSettings video_for(const Settings& s) {
     v.hud_sides = v.hud_edges;       // (as Phantom Hourglass: a HUD piece moved out keeps its place under a dialogue box,
                                      // the bands' clusters go to their side, a bar sliding out stays with the Menu button)
     v.texture_smoothing = s.textures == 1 ? ntr::TextureSmoothing::Smooth
-                          : s.textures == 2 ? ntr::TextureSmoothing::Sharp : ntr::TextureSmoothing::Off;
+                          : s.textures == 2 ? ntr::TextureSmoothing::Sharp
+                          : s.textures == 3 ? ntr::TextureSmoothing::Xbr : ntr::TextureSmoothing::Off;
     v.better_polygons = (s.fixes & 1) != 0;  // (seams between polygons in upscaled 3D)
     v.stable_textures = (s.fixes & 2) != 0;  // (textures the DS bends with the view, smeared)
     return v;
@@ -1391,6 +1392,7 @@ int main(int argc, char** argv) {
     if (textures_arg == "pixels") settings.textures = 0;
     else if (textures_arg == "smooth") settings.textures = 1;
     else if (textures_arg == "sharp") settings.textures = 2;
+    else if (textures_arg == "xbr") settings.textures = 3;
     if (fixes_arg >= 0 && fixes_arg <= 3) settings.fixes = fixes_arg;
     if (hd_text_arg) settings.hd_text = true;
     if (language_arg >= kLangAuto) settings.language = language_arg;
@@ -1719,7 +1721,7 @@ int main(int argc, char** argv) {
             if (settings.wide != on || (on && settings.wide_mode != mode))
                 settings.wide = on, settings.wide_mode = mode, changed = video = true;
         }
-        if (const int want = st::pad::textures.exchange(-1); want >= 0 && want <= 2 && want != settings.textures)
+        if (const int want = st::pad::textures.exchange(-1); want >= 0 && want <= 3 && want != settings.textures)
             settings.textures = want, changed = video = true;
         if (const int want = st::pad::fixes.exchange(-1); want >= 0 && want <= 3 && want != settings.fixes)
             settings.fixes = want, changed = video = true;

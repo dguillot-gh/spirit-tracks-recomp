@@ -59,9 +59,9 @@ public class GameActivity extends SDLActivity {
         if (hardware && prefs.getBoolean("wide", false)) args.add("--wide");
         if (hardware && prefs.getInt("wide_mode", 1) == 2) args.add("--wide21");
         if (hardware && prefs.getInt("wide_mode", 1) == 3) args.add("--wide1610");
-        final String[] textures = {"pixels", "smooth", "sharp"};
+        final String[] textures = {"pixels", "smooth", "sharp", "xbr"};
         args.add("--textures");
-        args.add(textures[Math.max(0, Math.min(2, prefs.getInt("textures", 0)))]);
+        args.add(textures[Math.max(0, Math.min(3, prefs.getInt("textures", 0)))]);
         args.add("--fixes");
         args.add("0");
         if (prefs.getBoolean("hd_text", false)) args.add("--hd-text");

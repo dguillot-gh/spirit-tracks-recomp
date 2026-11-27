@@ -33,6 +33,8 @@ program and Android app, set up for Spirit Tracks.
   time): both screens are shown joined, wide and without the gap between them, and back to the usual layout after
 - HD text: dialogue, choices and labels drawn with a vector font at the screen's own resolution, kept with save states
   (from Phantom Hourglass Recomp, by chouette-cc)
+- 3D textures (OpenGL renderer): the DS's pixels, smooth, sharp, or xBR (the texels' edges redrawn as smooth lines,
+  like an emulator's xBRZ texture filter)
 - Sharp or smooth filtering; the DS's shape or stretched
 
 **Play**
