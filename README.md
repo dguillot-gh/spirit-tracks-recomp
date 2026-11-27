@@ -138,6 +138,30 @@ D-pad + QoL patch v0.9c; see [What you need](#what-you-need)).
 `SHA256SUMS.txt` in each release has the files' checksums. The version and commit are shown on the start screen
 (Android) and in the window title and menu (Windows).
 
+## The launcher, changing the ROM, starting over (Windows)
+
+After the first build, `SpiritTracks.exe` opens a launcher before the game: **Continue** (where you last quit) or
+**Start game**, **Change ROM...** (pick another dump: the game is built again from it, saves kept), **Rebuild game**
+(from the kept ROM), **Open data folder**, **Quit**, and the main settings (screen, renderer, resolution, 3D textures,
+widescreen, fullscreen, HD text; the in-game menu, F1 or Esc, has the rest). Mouse, keyboard (arrows, Enter, Esc) and
+gamepad (D-pad, A) all work. `--no-launcher` starts the game straight away; `--setup` builds again from the command line.
+
+Everything lives in the data folder (the launcher's **Open data folder** opens it):
+
+- `%APPDATA%\ST-Recomp\SpiritTracks` (paste it into Explorer's address bar), or
+- `data\` next to the exe when a file named `portable.txt` is next to it (a portable copy, e.g. on a USB stick).
+
+| Folder / file | What it is | Starting over |
+|---|---|---|
+| `game\` | the game built from your ROM (`st_game.dll`, `st_game.id`) | delete: it is built again at the next start |
+| `rom\` | the copy of your ROM it was built from (`bkie.nds`) | delete to be asked for a ROM again |
+| `saves\` | your in-game save (`bkie.sav`) | **keep** |
+| `states\` | save states and the Continue state | keep (delete only to drop them) |
+| `settings.ini` | settings | delete to go back to the defaults |
+
+To start over with a different ROM by hand: close the game, delete `game\` and `rom\`, start `SpiritTracks.exe` and select
+the new dump. Your saves stay.
+
 ## Quick start: build it yourself
 
 You build the game on a Windows PC from your own copy of the game. It takes about an hour the first time, mostly
