@@ -6,6 +6,10 @@ time instead of emulated; the rest of the DS comes from [melonDS](https://github
 sister project of [phantom-hourglass-recomp](https://github.com/dguillot-gh/phantom-hourglass-recomp): the same engine,
 program and Android app, set up for Spirit Tracks.
 
+https://discord.gg/P3nqgTarW - discord link here
+
+For anyone who wants to join. 
+
 > **No game data is included.** You build the game from your own dump. Please don't share the builds you make: the
 > game folder and the APK contain the game.
 
